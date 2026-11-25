@@ -1,0 +1,58 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "appId": "com.curtissbooks.schoolmanager",
+  "productName": "CurtissBooks",
+  "copyright": "Copyright © 2026 CurtissBooks",
+  "directories": {
+    "output": "release",
+    "buildResources": "build"
+  },
+  "files": [
+    "dist/**/*",
+    "node_modules/**/*",
+    "package.json"
+  ],
+  "npmRebuild": false,
+  "nodeGypRebuild": false,
+  "asar": true,
+  "asarUnpack": [
+    "**/node_modules/better-sqlite3/**/*"
+  ],
+  "extraMetadata": {
+    "main": "dist/main/index.js"
+  },
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": [
+          "x64"
+        ]
+      }
+    ]
+  },
+  "mac": {
+    "target": [
+      "pkg",
+      "dmg",
+      "zip"
+    ],
+    "category": "public.app-category.finance",
+    "identity": null
+  },
+  "pkg": {
+    "installLocation": "/Applications",
+    "identity": null
+  },
+  "dmg": {
+    "title": "CurtissBooks Installer"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "CurtissBooks - School Manager"
+  }
+}
+

@@ -1,0 +1,109 @@
+{
+  "appName": "CurtissBooks",
+  "appSubtitle": "පාසල් මූල්‍ය කළමනාකරණ ERP පද්ධතිය",
+  "schoolName": "රාජකීය මධ්‍ය විද්‍යාලය",
+  "status": {
+    "offline": "නොබැඳි ආරක්ෂිත පර්යන්තය",
+    "connected": "සම්බන්ධිතයි",
+    "sqliteActive": "SQLite WAL සක්‍රියයි",
+    "active": "ක්‍රියාකාරී",
+    "inactive": "අක්‍රිය",
+    "draft": "කෙටුම්පත",
+    "pending": "අනුමැතිය අපේක්ෂිත",
+    "approved": "අනුමතයි",
+    "locked": "අගුලු ලා ඇත",
+    "persisted": "තැන්පත් කර ඇත",
+    "closed": "වසා ඇත",
+    "posted": "සටහන් කර ඇත",
+    "cancelled": "අවලංගුයි"
+  },
+  "theme": {
+    "light": "ලා පැහැය",
+    "dark": "තද පැහැය",
+    "system": "පද්ධති පෙරනිමිය",
+    "appearance": "පෙනුම"
+  },
+  "auth": {
+    "lockWorkstation": "කාර්යස්ථානය අගුළුලන්න",
+    "signOut": "පද්ධතියෙන් ඉවත් වන්න",
+    "locked": "අගුලු ලා ඇත",
+    "unlock": "අගුල හරින්න"
+  },
+  "paymentMethods": {
+    "cash": "අතැති මුදල්",
+    "bank": "බැංකු ගිණුම",
+    "petty_cash": "සුළු මුදල්",
+    "pettyCash": "සුළු මුදල් සංචිතය",
+    "bank_transfer": "බැංකු හුවමාරුව",
+    "bankTransfer": "බැංකු හුවමාරුව",
+    "cheque": "චෙක්පත",
+    "direct_deposit": "සෘජු තැන්පතුව",
+    "directDeposit": "සෘජු තැන්පතුව",
+    "other": "වෙනත්",
+    "unpaid": "නොගෙවූ / ණය"
+  },
+  "destinations": {
+    "cash": "අතැති මුදල්",
+    "bank": "බැංකු ගිණුම",
+    "petty_cash": "සුළු මුදල් සංචිතය"
+  },
+  "financial": {
+    "activeRunningYear": "සක්‍රිය මූල්‍ය වර්ෂය",
+    "closed": "වසා ඇත",
+    "draft": "කෙටුම්පත",
+    "approved": "අනුමතයි",
+    "operationalPeriod": "ක්‍රියාකාරී මූල්‍ය කාලසීමාව",
+    "switchPeriod": "කාලසීමාව මාරු කරන්න"
+  },
+  "actions": {
+    "save": "සුරකින්න",
+    "cancel": "අවලංගු කරන්න",
+    "confirm": "තහවුරු කරන්න",
+    "delete": "මකන්න",
+    "edit": "සංස්කරණය",
+    "create": "අලුතින් එක් කරන්න",
+    "search": "සොයන්න...",
+    "filter": "පෙරහන",
+    "refresh": "නැවුම් කරන්න",
+    "exportPdf": "PDF ලෙස ලබාගන්න",
+    "exportExcel": "Excel ලෙස ලබාගන්න",
+    "close": "වසන්න",
+    "viewAll": "සියල්ල බලන්න",
+    "collapse": "පැති තීරුව හකුලන්න",
+    "expand": "පැති තීරුව දිගහරින්න",
+    "viewTransactions": "ගනුදෙනු බලන්න",
+    "post": "සටහන් කරන්න",
+    "remove": "ඉවත් කරන්න"
+  },
+  "labels": {
+    "welcome": "ආයුබෝවන්",
+    "role": "ප්‍රධාන පරිපාලක",
+    "language": "භාෂාව",
+    "notifications": "දැනුම්දීම්",
+    "noNotifications": "නව දැනුම්දීම් නොමැත",
+    "quickActions": "ක්ෂණික ක්‍රියාමාර්ග",
+    "recentActivity": "මෑතකාලීන ක්‍රියාකාරකම්",
+    "financialYear": "මූල්‍ය වර්ෂය",
+    "notSet": "සකසා නැත",
+    "currency": "රු.",
+    "date": "දිනය",
+    "amount": "මුදල",
+    "reference": "යොමුව",
+    "status": "තත්ත්වය",
+    "actions": "ක්‍රියාකාරකම්",
+    "records": "වාර්තා",
+    "notes": "සටහන්",
+    "description": "විස්තරය",
+    "payee": "ගෙවන්නා / මුදල් ලැබුම්කරු",
+    "category": "කාණ්ඩය",
+    "all": "සියල්ල",
+    "code": "කේතය",
+    "balance": "ශේෂය"
+  },
+  "window": {
+    "minimize": "හකුලන්න",
+    "maximize": "විශාල කරන්න",
+    "restore": "ප්‍රතිස්ථාපනය",
+    "close": "වසන්න"
+  }
+}

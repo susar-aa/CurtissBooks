@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Production build and packaging artifacts
+dist/
+release/
+out/
+
+# Database files and dev instance storage
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+.curtissbooks_dev/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Operating System Files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,151 @@
+export const IPC_CHANNELS = {
+  // Window controls
+  WINDOW_MINIMIZE: 'window:minimize',
+  WINDOW_MAXIMIZE: 'window:maximize',
+  WINDOW_CLOSE: 'window:close',
+  WINDOW_IS_MAXIMIZED: 'window:isMaximized',
+
+  // App & System info
+  APP_GET_INFO: 'app:getInfo',
+
+  // Application Settings
+  SETTINGS_GET_ALL: 'settings:getAll',
+  SETTINGS_GET: 'settings:get',
+  SETTINGS_SET: 'settings:set',
+
+  // Authentication & Session
+  AUTH_CHECK_SETUP: 'auth:checkSetup',
+  AUTH_SETUP_INITIAL_ADMIN: 'auth:setupInitialAdmin',
+  AUTH_LOGIN: 'auth:login',
+  AUTH_LOGOUT: 'auth:logout',
+  AUTH_GET_CURRENT_SESSION: 'auth:getCurrentSession',
+  AUTH_LOCK_SESSION: 'auth:lockSession',
+  AUTH_UNLOCK_SESSION: 'auth:unlockSession',
+
+  // User Management
+  USERS_GET_ALL: 'users:getAll',
+  USERS_GET_BY_ID: 'users:getById',
+  USERS_CREATE: 'users:create',
+  USERS_UPDATE: 'users:update',
+  USERS_SET_STATUS: 'users:setStatus',
+  USERS_RESET_PASSWORD: 'users:resetPassword',
+
+  // Roles & Permissions
+  ROLES_GET_ALL: 'roles:getAll',
+  ROLES_UPDATE_PERMISSIONS: 'roles:updatePermissions',
+  PERMISSIONS_GET_ALL: 'permissions:getAll',
+
+  // Audit Logs
+  AUDIT_GET_LOGS: 'audit:getLogs',
+
+  // School Profile
+  SCHOOL_GET_PROFILE: 'school:getProfile',
+  SCHOOL_UPDATE_PROFILE: 'school:updateProfile',
+  SCHOOL_SAVE_LOGO: 'school:saveLogo',
+
+  // Academic Structure
+  ACADEMIC_GET_YEARS: 'academic:getYears',
+  ACADEMIC_CREATE_YEAR: 'academic:createYear',
+  ACADEMIC_UPDATE_YEAR: 'academic:updateYear',
+  ACADEMIC_SET_CURRENT_YEAR: 'academic:setCurrentYear',
+  ACADEMIC_GET_GRADES: 'academic:getGrades',
+  ACADEMIC_CREATE_GRADE: 'academic:createGrade',
+  ACADEMIC_UPDATE_GRADE: 'academic:updateGrade',
+  ACADEMIC_GET_CLASSES: 'academic:getClasses',
+  ACADEMIC_CREATE_CLASS: 'academic:createClass',
+  ACADEMIC_UPDATE_CLASS: 'academic:updateClass',
+
+  // Financial Accounting System
+  FINANCIAL_GET_YEARS: 'financial:getYears',
+  FINANCIAL_GET_YEAR_DETAIL: 'financial:getYearDetail',
+  FINANCIAL_CREATE_YEAR: 'financial:createYear',
+  FINANCIAL_SAVE_YEAR_DRAFT: 'financial:saveYearDraft',
+  FINANCIAL_APPROVE_YEAR: 'financial:approveYear',
+  FINANCIAL_SET_CURRENT_YEAR: 'financial:setCurrentYear',
+  FINANCIAL_CLOSE_YEAR: 'financial:closeYear',
+  FINANCIAL_GET_REUSABLE_CATEGORIES: 'financial:getReusableCategories',
+  FINANCIAL_SUGGEST_CATEGORY_CODE: 'financial:suggestCategoryCode',
+  FINANCIAL_QUICK_CREATE_CATEGORY: 'financial:quickCreateCategory',
+  FINANCIAL_UPDATE_CATEGORY: 'financial:updateCategory',
+  FINANCIAL_TOGGLE_CATEGORY_STATUS: 'financial:toggleCategoryStatus',
+  FINANCIAL_GET_ACCOUNTS: 'financial:getAccounts',
+  FINANCIAL_GET_BUDGET_CATEGORIES: 'financial:getBudgetCategories',
+  FINANCIAL_CREATE_BUDGET_CATEGORY: 'financial:createBudgetCategory',
+  FINANCIAL_SAVE_BUDGET_ALLOCATION: 'financial:saveBudgetAllocation',
+  FINANCIAL_APPROVE_BUDGET: 'financial:approveBudget',
+  FINANCIAL_REVISE_BUDGET: 'financial:reviseBudget',
+  FINANCIAL_GET_FUNDS: 'financial:getFunds',
+  FINANCIAL_CREATE_FUND: 'financial:createFund',
+  FINANCIAL_QUICK_CREATE_FUND_CATEGORY: 'financial:quickCreateFundCategory',
+  FINANCIAL_GET_FUND_CATEGORIES: 'financial:getFundCategories',
+  FINANCIAL_CREATE_FUND_CATEGORY: 'financial:createFundCategory',
+  FINANCIAL_UPDATE_FUND_CATEGORY: 'financial:updateFundCategory',
+  FINANCIAL_GET_FUND_TRACES: 'financial:getFundTraces',
+  FINANCIAL_GET_FUND_RECEIPTS: 'financial:getFundReceipts',
+  FINANCIAL_GET_FUND_RECEIPTS_SUMMARY: 'financial:getFundReceiptsSummary',
+  FINANCIAL_CREATE_FUND_RECEIPT: 'financial:createFundReceipt',
+  FINANCIAL_GET_EXPENSES: 'financial:getExpenses',
+  FINANCIAL_CREATE_EXPENSE: 'financial:createExpense',
+  FINANCIAL_QUICK_CREATE_EXPENSE_BUDGET_CATEGORY: 'financial:quickCreateExpenseBudgetCategory',
+  FINANCIAL_CANCEL_EXPENSE: 'financial:cancelExpense',
+  FINANCIAL_GET_CASH_TRANSACTIONS: 'financial:getCashTransactions',
+  FINANCIAL_GET_UNIFIED_CASH_BOOK: 'financial:getUnifiedCashBook',
+  FINANCIAL_GET_PETTY_CASH: 'financial:getPettyCash',
+  FINANCIAL_RECORD_PETTY_CASH_EXPENSE: 'financial:recordPettyCashExpense',
+  FINANCIAL_REPLENISH_PETTY_CASH: 'financial:replenishPettyCash',
+  FINANCIAL_GET_BANK_ACCOUNTS: 'financial:getBankAccounts',
+  FINANCIAL_CREATE_BANK_ACCOUNT: 'financial:createBankAccount',
+  FINANCIAL_GET_BANK_TRANSACTIONS: 'financial:getBankTransactions',
+  FINANCIAL_GET_SUMMARY_STATS: 'financial:getSummaryStats',
+  FINANCIAL_GET_TRIAL_BALANCE: 'financial:getTrialBalance',
+  FINANCIAL_GET_REIMBURSEMENT_VOUCHERS: 'financial:getReimbursementVouchers',
+  FINANCIAL_GET_REIMBURSEMENT_REPORT: 'financial:getReimbursementReport',
+  FINANCIAL_GET_ACCOUNT_BALANCES: 'financial:getAccountBalances',
+  FINANCIAL_CREATE_FUND_TRANSFER: 'financial:createFundTransfer',
+  FINANCIAL_REVERSE_FUND_TRANSFER: 'financial:reverseFundTransfer',
+  FINANCIAL_GET_FUND_TRANSFERS: 'financial:getFundTransfers',
+  FINANCIAL_TRANSFER_BUDGET: 'financial:transferBudget',
+  FINANCIAL_GET_BUDGET_REALLOCATIONS: 'financial:getBudgetReallocations',
+
+  // Cheque Management
+  FINANCIAL_GET_CHEQUES: 'financial:getCheques',
+  FINANCIAL_GET_CHEQUES_SUMMARY: 'financial:getChequesSummary',
+  FINANCIAL_GET_CHEQUE_DETAIL: 'financial:getChequeDetail',
+  FINANCIAL_RECORD_RECEIVED_CHEQUE: 'financial:recordReceivedCheque',
+  FINANCIAL_DEPOSIT_RECEIVED_CHEQUE: 'financial:depositReceivedCheque',
+  FINANCIAL_CLEAR_RECEIVED_CHEQUE: 'financial:clearReceivedCheque',
+  FINANCIAL_BOUNCE_RECEIVED_CHEQUE: 'financial:bounceReceivedCheque',
+  FINANCIAL_CANCEL_RECEIVED_CHEQUE: 'financial:cancelReceivedCheque',
+  FINANCIAL_RECORD_ISSUED_CHEQUE: 'financial:recordIssuedCheque',
+  FINANCIAL_PRESENT_ISSUED_CHEQUE: 'financial:presentIssuedCheque',
+  FINANCIAL_CLEAR_ISSUED_CHEQUE: 'financial:clearIssuedCheque',
+  FINANCIAL_BOUNCE_ISSUED_CHEQUE: 'financial:bounceIssuedCheque',
+  FINANCIAL_CANCEL_ISSUED_CHEQUE: 'financial:cancelIssuedCheque',
+
+  // Bank Reconciliation
+  FINANCIAL_CREATE_RECONCILIATION_SESSION: 'financial:createReconciliationSession',
+  FINANCIAL_GET_RECONCILIATION_SESSIONS: 'financial:getReconciliationSessions',
+  FINANCIAL_GET_RECONCILIATION_SESSION_DETAIL: 'financial:getReconciliationSessionDetail',
+  FINANCIAL_IMPORT_BANK_STATEMENT: 'financial:importBankStatement',
+  FINANCIAL_GET_STATEMENT_TRANSACTIONS: 'financial:getStatementTransactions',
+  FINANCIAL_GET_SYSTEM_TRANSACTIONS_FOR_RECON: 'financial:getSystemTransactionsForRecon',
+  FINANCIAL_AUTO_MATCH_TRANSACTIONS: 'financial:autoMatchTransactions',
+  FINANCIAL_MANUAL_MATCH_TRANSACTION: 'financial:manualMatchTransaction',
+  FINANCIAL_UNMATCH_TRANSACTION: 'financial:unmatchTransaction',
+  FINANCIAL_RECORD_RECON_ADJUSTMENT: 'financial:recordReconAdjustment',
+  FINANCIAL_TOGGLE_RECON_TICK: 'financial:toggleReconTick',
+  FINANCIAL_BATCH_RECON_TICK: 'financial:batchReconTick',
+  FINANCIAL_UPDATE_RECON_BALANCES: 'financial:updateReconBalances',
+  FINANCIAL_GET_RECONCILIATION_SUMMARY: 'financial:getReconciliationSummary',
+  FINANCIAL_COMPLETE_RECONCILIATION: 'financial:completeReconciliation',
+  FINANCIAL_REOPEN_RECONCILIATION: 'financial:reopenReconciliation',
+
+  // Periodic Financial Statement (Annexure 19)
+  FINANCIAL_GET_PERIODIC_STATEMENT_MAPPINGS: 'financial:getPeriodicStatementMappings',
+  FINANCIAL_SAVE_PERIODIC_STATEMENT_MAPPINGS: 'financial:savePeriodicStatementMappings',
+  FINANCIAL_AUTO_ASSIGN_PERIODIC_STATEMENT_MAPPINGS: 'financial:autoAssignPeriodicStatementMappings',
+  FINANCIAL_GET_PERIODIC_STATEMENT_REPORT: 'financial:getPeriodicStatementReport',
+  FINANCIAL_SAVE_PERIODIC_STATEMENT_ADJUSTMENTS: 'financial:savePeriodicStatementAdjustments',
+};
+
+export type IpcChannel = typeof IPC_CHANNELS[keyof typeof IPC_CHANNELS];

@@ -1,0 +1,26 @@
+{
+  "groups": {
+    "overview": "Overview",
+    "financial": "Financial Accounting",
+    "governance": "System & Governance"
+  },
+  "items": {
+    "dashboard": "Dashboard",
+    "financialYear": "Financial Year",
+    "budget": "Annual Budget",
+    "funds": "Fund Management",
+    "expenses": "Expense Management",
+    "cheques": "Cheque Management",
+    "transfers": "Fund Transfers",
+    "cashbook": "Cash Book",
+    "pettycash": "Petty Cash",
+    "bank": "Bank Accounts",
+    "reconciliation": "Bank Reconciliation",
+    "periodicStatement": "Periodic Statement",
+    "reports": "Financial Reports",
+    "audit": "Audit Logs",
+    "users": "User Management",
+    "settings": "Settings"
+  }
+}
+

@@ -1,0 +1,109 @@
+{
+  "appName": "CurtissBooks",
+  "appSubtitle": "School Financial Management ERP",
+  "schoolName": "Royal Central College",
+  "status": {
+    "offline": "Offline Secure Node",
+    "connected": "Connected",
+    "sqliteActive": "SQLite WAL Active",
+    "active": "Active",
+    "inactive": "Inactive",
+    "draft": "Draft",
+    "pending": "Pending",
+    "approved": "Approved",
+    "locked": "Locked",
+    "persisted": "Persisted",
+    "closed": "Closed",
+    "posted": "Posted",
+    "cancelled": "Cancelled"
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System",
+    "appearance": "Appearance"
+  },
+  "auth": {
+    "lockWorkstation": "Lock Workstation",
+    "signOut": "Sign Out",
+    "locked": "Locked",
+    "unlock": "Unlock"
+  },
+  "paymentMethods": {
+    "cash": "Cash in Hand",
+    "bank": "Bank Account",
+    "petty_cash": "Petty Cash",
+    "pettyCash": "Petty Cash Float",
+    "bank_transfer": "Bank Transfer",
+    "bankTransfer": "Bank Transfer",
+    "cheque": "Cheque",
+    "direct_deposit": "Direct Deposit",
+    "directDeposit": "Direct Deposit",
+    "other": "Other",
+    "unpaid": "Unpaid / Credit"
+  },
+  "destinations": {
+    "cash": "Cash in Hand",
+    "bank": "Bank Account",
+    "petty_cash": "Petty Cash Float"
+  },
+  "financial": {
+    "activeRunningYear": "Active Running Year",
+    "closed": "Closed",
+    "draft": "Draft",
+    "approved": "Approved",
+    "operationalPeriod": "Operational Financial Period",
+    "switchPeriod": "Switch Period"
+  },
+  "actions": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create New",
+    "search": "Search...",
+    "filter": "Filter",
+    "refresh": "Refresh",
+    "exportPdf": "Export PDF",
+    "exportExcel": "Export Excel",
+    "close": "Close",
+    "viewAll": "View All",
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar",
+    "viewTransactions": "View Transactions",
+    "post": "Post",
+    "remove": "Remove"
+  },
+  "labels": {
+    "welcome": "Welcome back",
+    "role": "Administrator",
+    "language": "Language",
+    "notifications": "Notifications",
+    "noNotifications": "No new notifications",
+    "quickActions": "Quick Actions",
+    "recentActivity": "Recent Activity",
+    "financialYear": "Financial Year",
+    "notSet": "Not Set",
+    "currency": "LKR",
+    "date": "Date",
+    "amount": "Amount",
+    "reference": "Reference",
+    "status": "Status",
+    "actions": "Actions",
+    "records": "Records",
+    "notes": "Notes",
+    "description": "Description",
+    "payee": "Payee",
+    "category": "Category",
+    "all": "All",
+    "code": "Code",
+    "balance": "Balance"
+  },
+  "window": {
+    "minimize": "Minimize",
+    "maximize": "Maximize",
+    "restore": "Restore",
+    "close": "Close"
+  }
+}

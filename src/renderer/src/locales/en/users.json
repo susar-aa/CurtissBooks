@@ -1,0 +1,60 @@
+{
+  "title": "User Management & Role Permissions",
+  "subtitle": "Administer staff accounts, institutional roles, and granular security permissions.",
+  "tabs": {
+    "users": "Staff Directory",
+    "roles": "Roles & Permissions Matrix",
+    "audit": "Security Audit Trail"
+  },
+  "columns": {
+    "name": "Full Name",
+    "username": "Username",
+    "role": "Assigned Role",
+    "status": "Account Status",
+    "lastLogin": "Last Login",
+    "created": "Created At",
+    "actions": "Actions"
+  },
+  "status": {
+    "active": "Active",
+    "inactive": "Inactive",
+    "locked": "Locked"
+  },
+  "actions": {
+    "addUser": "Add New User",
+    "editUser": "Edit Profile",
+    "resetPassword": "Reset Password",
+    "deactivate": "Deactivate",
+    "activate": "Activate",
+    "savePermissions": "Save Permission Matrix"
+  },
+  "modals": {
+    "createTitle": "Register Staff User",
+    "editTitle": "Edit Staff User Profile",
+    "resetTitle": "Reset User Password",
+    "fullName": "Full Name",
+    "username": "Username (Login ID)",
+    "role": "Role Assignment",
+    "password": "Initial Password",
+    "confirmPassword": "Confirm Password",
+    "newPassword": "New Password",
+    "confirmNewPassword": "Confirm New Password",
+    "deactivateConfirmTitle": "Deactivate Staff User?",
+    "deactivateConfirmMessage": "Are you sure you want to deactivate this account? The user will immediately be barred from signing in."
+  },
+  "rolesTab": {
+    "selectRole": "Select Role to Configure",
+    "roleDescription": "Permissions enabled below dictate module access and administrative authorization limits.",
+    "module": "Module / Capability",
+    "permissions": "Configured Actions"
+  },
+  "auditTab": {
+    "timestamp": "Timestamp",
+    "user": "User / Actor",
+    "action": "Security Event",
+    "result": "Result",
+    "details": "Details",
+    "noLogs": "No security events recorded yet."
+  }
+}
+

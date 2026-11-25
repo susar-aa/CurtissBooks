@@ -1,0 +1,50 @@
+{
+  "welcomeTitle": "Financial Operations Center",
+  "welcomeSubtitle": "Offline desktop ERP for institutional accounting, budgeting, and student records.",
+  "financialYearBadge": "FY 2026/2027 (Uninitialized)",
+  "metrics": {
+    "annualBudget": {
+      "title": "Annual Budget",
+      "subtext": "Stage 06: Awaiting approved budget allocation"
+    },
+    "totalExpenses": {
+      "title": "Total Expenses",
+      "subtext": "Stage 08: 0 commitments recorded"
+    },
+    "liquidAssets": {
+      "title": "Liquid Cash & Bank",
+      "subtext": "Stages 09-10: 0 registered accounts"
+    },
+    "activeFunds": {
+      "title": "Active Grants & Funds",
+      "subtext": "Stage 07: 0 active government/private funds"
+    }
+  },
+  "emptyActivity": {
+    "title": "No Financial Activity Recorded",
+    "description": "Financial ledger transactions, vouchers, and cash receipts will appear here in real-time once the Chart of Accounts and Financial Year are configured."
+  },
+  "charts": {
+    "budgetVsActual": {
+      "title": "Monthly Budget vs. Actual Expenditure",
+      "placeholder": "Visual comparison chart will activate upon budget approval."
+    },
+    "expenseDistribution": {
+      "title": "Expense Distribution by Main Category",
+      "placeholder": "Category allocation breakdown requires posted expense vouchers."
+    }
+  },
+  "quickActions": {
+    "title": "Primary Workflows",
+    "setupBudget": "Annual Budget",
+    "recordExpense": "New Expense",
+    "cashBook": "Cash Book"
+  },
+  "systemStatus": {
+    "title": "Local Storage & Engine Status",
+    "dbConnected": "SQLite Database Connected",
+    "storageMode": "WAL Journal Concurrency",
+    "integrity": "Foreign Key Invariants Enforced"
+  }
+}
+

@@ -1,0 +1,53 @@
+{
+  "name": "curtissbooks",
+  "version": "1.0.0",
+  "description": "School Management & Financial Accounting Desktop Application",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "dev:renderer": "vite",
+    "build:main": "tsc -p tsconfig.node.json",
+    "build:renderer": "vite build",
+    "build": "npm run build:main && npm run build:renderer",
+    "start": "node scripts/run-electron.js",
+    "dev": "npm run build && node scripts/run-electron.js",
+    "test:stage01": "npm run build && node tests/stage01.test.js",
+    "test:stage02": "npm run build && node tests/stage02.test.js",
+    "test:stage03": "npm run build && node tests/stage03.test.js",
+    "test:financial": "npm run build && node tests/stage05_to_14_financial.test.js",
+    "test:stage06": "npm run build && node tests/stage06_budget_workflow.test.js",
+    "test": "npm run test:stage01 && node tests/stage02.test.js && node tests/stage03.test.js && node tests/stage05_to_14_financial.test.js && node tests/stage06_budget_workflow.test.js",
+    "dist": "npm run build && electron-builder --win",
+    "dist:mac": "npm run build && electron-builder --mac -c.npmRebuild=true"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@fontsource/noto-sans-sinhala": "^5.3.0",
+    "better-sqlite3": "^13.0.3",
+    "clsx": "^2.1.1",
+    "i18next": "^26.7.1",
+    "lucide-react": "^1.66.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-i18next": "^17.1.11",
+    "tailwind-merge": "^3.7.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.2.1",
+    "autoprefixer": "^10.6.2",
+    "electron": "^45.2.1",
+    "electron-builder": "^26.18.0",
+    "postcss": "^8.5.32",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5"
+  }
+}

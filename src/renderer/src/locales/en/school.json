@@ -1,0 +1,20 @@
+{
+  "title": "Institutional Profile & Identity",
+  "subtitle": "Configure school registration details, official addresses, principal identity, and visual crest.",
+  "nameEn": "School Name in English",
+  "nameSi": "School Name in Sinhala",
+  "regNo": "Ministry / Provincial Registration No.",
+  "schoolType": "School Classification Type",
+  "addressEn": "Official Postal Address (English)",
+  "addressSi": "Official Postal Address (Sinhala)",
+  "telephone": "General Telephone / Fax",
+  "email": "Official Institutional Email",
+  "principal": "Principal / Head of Institution",
+  "established": "Date Established",
+  "vision": "Vision Statement",
+  "mission": "Mission Statement",
+  "logo": "Official School Crest / Logo",
+  "uploadLogo": "Upload School Crest (PNG / WEBP, Max 2MB)",
+  "saveSuccess": "School profile updated successfully."
+}
+
