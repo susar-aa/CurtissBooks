@@ -335,6 +335,31 @@ assert(autoRow, 'Auto-assigned category row is present on statement');
 assert.strictEqual(autoRow.current_period_cents, 4500000, 'Direct category row displays exact transactions');
 console.log('✓ Automatic category transaction discovery & display verified cleanly.\n');
 
+// --- TEST 9: VERIFY BOUNCED CHEQUE TOTAL & FEE AUTO-DETECTION ---
+console.log('--- TEST 9: VERIFY BOUNCED CHEQUE TOTAL & FEE AUTO-DETECTION ---');
+// Insert a bounced cheque in 3rd period
+db.prepare(`
+  INSERT INTO cheques (cheque_type, cheque_number, amount_cents, status, cheque_date, bounce_date, bounce_reason)
+  VALUES ('received', 'CHQ-BOUNCE-99', 1000000, 'bounced', '2026-09-05', '2026-09-15', 'Insufficient Funds')
+`).run();
+
+// Insert a bank bounce fee in bank_transactions
+db.prepare(`
+  INSERT INTO bank_transactions (bank_account_id, transaction_date, transaction_type, amount_cents, description, is_reconciled)
+  VALUES (?, '2026-09-16', 'bank_charge', -50000, 'Cheque return fee / චෙක් අගරු ගාස්තු', 0)
+`).run(bank.id);
+
+const rep3 = FinancialService.getPeriodicStatementReport({
+  financialYearId: fyId,
+  periodType: '3rd',
+  startDate: '2026-09-01',
+  endDate: '2026-12-31',
+});
+
+assert.strictEqual(rep3.calculation.other_additions_cents, 1000000, 'Auto-detected bounced cheque total: Rs. 10,000.00');
+assert.strictEqual(rep3.calculation.bank_charges_cents, 50000, 'Auto-detected cheque bounce fee: Rs. 500.00');
+console.log('✓ Bounced cheque total Rs. 10,000.00 and fee Rs. 500.00 auto-detected correctly matching sample document.\n');
+
 console.log('================================================================');
 console.log('>>> ALL PERIODIC FINANCIAL STATEMENT TESTS PASSED CLEANLY! <<<');
 console.log('================================================================');

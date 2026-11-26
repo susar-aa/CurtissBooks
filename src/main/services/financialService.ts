@@ -7165,30 +7165,51 @@ export class FinancialService {
     let pettyCashBalanceCents = 0;
     let notes = '';
 
+    // Auto-detect bounced cheques during the period
+    const bouncedRes = db.prepare(`
+      SELECT COALESCE(SUM(amount_cents), 0) as bounced_sum
+      FROM cheques
+      WHERE status = 'bounced'
+        AND ((bounce_date IS NOT NULL AND bounce_date >= ? AND bounce_date <= ?)
+             OR (bounce_date IS NULL AND cheque_date >= ? AND cheque_date <= ?))
+    `).get(startDate, endDate, startDate, endDate) as any;
+    const autoBouncedCents = Number(bouncedRes?.bounced_sum || 0);
+
+    // Auto-detect bank charges / cheque return fee during the period
+    const chargesRes = db.prepare(`
+      SELECT COALESCE(SUM(ABS(amount_cents)), 0) as charges
+      FROM bank_transactions
+      WHERE transaction_date >= ? AND transaction_date <= ?
+        AND (
+          transaction_type = 'bank_charge'
+          OR description LIKE '%charge%'
+          OR description LIKE '%fee%'
+          OR description LIKE '%bounce%'
+          OR description LIKE '%return%'
+          OR description LIKE '%අගරු%'
+        )
+    `).get(startDate, endDate) as any;
+    const autoChargesCents = Number(chargesRes?.charges || 0);
+
+    // Auto-detect petty cash balance remaining at period end
+    const pcBalRes = db.prepare(`
+      SELECT COALESCE(SUM(CASE WHEN type IN ('replenishment', 'transfer_in') THEN amount_cents ELSE -amount_cents END), 0) as bal
+      FROM petty_cash_vouchers
+      WHERE voucher_date <= ? AND status = 'approved'
+    `).get(endDate) as any;
+    const autoPettyCashBalCents = Math.max(0, Number(pcBalRes?.bal || 0));
+
     if (adjRow) {
-      otherAdditionsCents = Number(adjRow.other_additions_cents || 0);
+      otherAdditionsCents = Number(adjRow.other_additions_cents) || autoBouncedCents;
       canteenRefundCents = Number(adjRow.canteen_refund_cents || 0);
       chequeReissueCents = Number(adjRow.cheque_reissue_cents || 0);
-      bankChargesCents = Number(adjRow.bank_charges_cents || 0);
-      pettyCashBalanceCents = Number(adjRow.petty_cash_balance_cents || 0);
+      bankChargesCents = Number(adjRow.bank_charges_cents) || autoChargesCents;
+      pettyCashBalanceCents = Number(adjRow.petty_cash_balance_cents) || autoPettyCashBalCents;
       notes = adjRow.notes || '';
     } else {
-      // Auto-detect bank charges during the period
-      const chargesRes = db.prepare(`
-        SELECT COALESCE(SUM(ABS(amount_cents)), 0) as charges
-        FROM bank_transactions
-        WHERE transaction_date >= ? AND transaction_date <= ?
-          AND (transaction_type = 'bank_charge' OR description LIKE 'Bank Charge%' OR description LIKE 'Bank Fee%')
-      `).get(startDate, endDate) as any;
-      bankChargesCents = Number(chargesRes?.charges || 0);
-
-      // Auto-detect petty cash balance remaining at period end
-      const pcBalRes = db.prepare(`
-        SELECT COALESCE(SUM(CASE WHEN type IN ('replenishment', 'transfer_in') THEN amount_cents ELSE -amount_cents END), 0) as bal
-        FROM petty_cash_vouchers
-        WHERE voucher_date <= ? AND status = 'approved'
-      `).get(endDate) as any;
-      pettyCashBalanceCents = Math.max(0, Number(pcBalRes?.bal || 0));
+      otherAdditionsCents = autoBouncedCents;
+      bankChargesCents = autoChargesCents;
+      pettyCashBalanceCents = autoPettyCashBalCents;
     }
 
     const subtotalReceiptsCents = openingBalanceCents + totalReceiptsCents + otherAdditionsCents;

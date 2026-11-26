@@ -469,7 +469,7 @@ export const PeriodicFinancialStatementView: React.FC<PeriodicFinancialStatement
       '',
       '',
       reportData.opening_balance_cents / 100,
-      firstExp ? `${firstExp.report_code || firstExp.category_code || ''} ${firstExp.label_si || ''}`.trim() : '',
+      firstExp ? (firstExp.report_code || firstExp.category_code || '') : '',
       firstExp ? (firstExp.annual_estimate_cents ? firstExp.annual_estimate_cents / 100 : '') : '',
       firstExp ? (firstExp.prior_cumulative_cents ? firstExp.prior_cumulative_cents / 100 : '') : '',
       firstExp ? (firstExp.current_period_cents ? firstExp.current_period_cents / 100 : '') : '',
@@ -484,12 +484,12 @@ export const PeriodicFinancialStatementView: React.FC<PeriodicFinancialStatement
       const right = rightSideList[i];
 
       sheetData.push([
-        left ? `${left.report_code || left.category_code || ''} ${left.label_si || ''}`.trim() : '',
+        left ? (left.report_code || left.category_code || '') : '',
         left ? (left.annual_estimate_cents ? left.annual_estimate_cents / 100 : '') : '',
         left ? (left.prior_cumulative_cents ? left.prior_cumulative_cents / 100 : '') : '',
         left ? (left.current_period_cents ? left.current_period_cents / 100 : '') : '',
         left ? (left.total_cumulative_cents ? left.total_cumulative_cents / 100 : '') : '',
-        right ? `${right.report_code || right.category_code || ''} ${right.label_si || ''}`.trim() : '',
+        right ? (right.report_code || right.category_code || '') : '',
         right ? (right.annual_estimate_cents ? right.annual_estimate_cents / 100 : '') : '',
         right ? (right.prior_cumulative_cents ? right.prior_cumulative_cents / 100 : '') : '',
         right ? (right.current_period_cents ? right.current_period_cents / 100 : '') : '',
@@ -517,9 +517,7 @@ export const PeriodicFinancialStatementView: React.FC<PeriodicFinancialStatement
     const calc = reportData.calculation;
     sheetData.push([`${calc.period_start_date} දිනට ශේෂය`, calc.opening_balance_cents / 100]);
     sheetData.push([`${calc.period_end_date} දක්වා ලැබීම්`, calc.total_receipts_cents / 100]);
-    if (calc.other_additions_cents > 0) {
-      sheetData.push(['(+) අනෙකුත් තැන්පතු', calc.other_additions_cents / 100]);
-    }
+    sheetData.push(['(+) අගරු චෙක්', (calc.other_additions_cents || 0) / 100]);
     sheetData.push(['අතුරු එකතුව (Subtotal)', calc.subtotal_receipts_cents / 100]);
     sheetData.push([`${calc.period_end_date} දක්වා ගෙවීම්`, calc.total_payments_cents / 100]);
     if (calc.canteen_refund_cents > 0) {
@@ -528,12 +526,8 @@ export const PeriodicFinancialStatementView: React.FC<PeriodicFinancialStatement
     if (calc.cheque_reissue_cents > 0) {
       sheetData.push(['(-) චෙක්පත් නැවත නිකුතුව', calc.cheque_reissue_cents / 100]);
     }
-    if (calc.bank_charges_cents > 0) {
-      sheetData.push(['(-) බැංකු අමතර ගාස්තු', calc.bank_charges_cents / 100]);
-    }
-    if (calc.petty_cash_balance_cents > 0) {
-      sheetData.push(['(-) සුළු මුදල් අත ඉතිරිය', calc.petty_cash_balance_cents / 100]);
-    }
+    sheetData.push(['(-) චෙක් අගරු ගාස්තු', (calc.bank_charges_cents || 0) / 100]);
+    sheetData.push(['(-) සුළු මුදල් අත ඉතිරිය', (calc.petty_cash_balance_cents || 0) / 100]);
     sheetData.push([`${calc.period_end_date} දිනට ශේෂය (Closing Balance)`, calc.closing_balance_cents / 100]);
 
     const ws = XLSX.utils.aoa_to_sheet(sheetData);
@@ -789,12 +783,7 @@ export const PeriodicFinancialStatementView: React.FC<PeriodicFinancialStatement
 
                     <td className="border-r border-b border-zinc-900 px-2 py-1 font-medium">
                       {firstExp ? (
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold">{firstExp.report_code || firstExp.category_code}</span>
-                          <span className="text-[9.5px] text-zinc-700 truncate max-w-[130px] ml-1">
-                            {firstExp.label_si}
-                          </span>
-                        </div>
+                        <span className="font-bold">{firstExp.report_code || firstExp.category_code}</span>
                       ) : (
                         ''
                       )}
@@ -835,12 +824,7 @@ export const PeriodicFinancialStatementView: React.FC<PeriodicFinancialStatement
                       {/* Left: Receipts */}
                       <td className="border-r border-b border-zinc-900 px-2 py-1 font-medium">
                         {left ? (
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold">{left.report_code || left.category_code}</span>
-                            <span className="text-[9.5px] text-zinc-700 truncate max-w-[130px] ml-1">
-                              {left.label_si}
-                            </span>
-                          </div>
+                          <span className="font-bold">{left.report_code || left.category_code}</span>
                         ) : (
                           ''
                         )}
@@ -861,12 +845,7 @@ export const PeriodicFinancialStatementView: React.FC<PeriodicFinancialStatement
                       {/* Right: Payments */}
                       <td className="border-r border-b border-zinc-900 px-2 py-1 font-medium">
                         {right ? (
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold">{right.report_code || right.category_code}</span>
-                            <span className="text-[9.5px] text-zinc-700 truncate max-w-[130px] ml-1">
-                              {right.label_si}
-                            </span>
-                          </div>
+                          <span className="font-bold">{right.report_code || right.category_code}</span>
                         ) : (
                           ''
                         )}
@@ -944,13 +923,11 @@ export const PeriodicFinancialStatementView: React.FC<PeriodicFinancialStatement
                 <span className="font-mono font-medium">{fmt(reportData.calculation.total_receipts_cents)}</span>
               </div>
 
-              {/* Row 3: Other additions (+) */}
-              {reportData.calculation.other_additions_cents > 0 && (
-                <div className="flex justify-between items-baseline py-0.5">
-                  <span>(+) අනෙකුත් තැන්පතු</span>
-                  <span className="font-mono font-medium">{fmt(reportData.calculation.other_additions_cents)}</span>
-                </div>
-              )}
+              {/* Row 3: Bounced Cheque Total (+) (matching Image 2) */}
+              <div className="flex justify-between items-baseline py-0.5">
+                <span>(+)අගරු චෙක්</span>
+                <span className="font-mono font-medium">{fmt(reportData.calculation.other_additions_cents || 0)}</span>
+              </div>
 
               {/* Separator line */}
               <div className="border-b border-zinc-900 my-0.5" />
@@ -967,37 +944,33 @@ export const PeriodicFinancialStatementView: React.FC<PeriodicFinancialStatement
                 <span className="font-mono font-medium">{fmt(reportData.calculation.total_payments_cents)}</span>
               </div>
 
-              {/* Row 5: Canteen deposit refunds (-) */}
+              {/* Optional Canteen Refund (-) */}
               {reportData.calculation.canteen_refund_cents > 0 && (
                 <div className="flex justify-between items-baseline py-0.5">
-                  <span>(-) ආපනශාලා තැන්පතු මුදල් ආපසු ගෙවුම්</span>
+                  <span>(-)ආපනශාලා තැන්පතු මුදල් ආපසු ගෙවීම්</span>
                   <span className="font-mono font-medium">{fmt(reportData.calculation.canteen_refund_cents)}</span>
                 </div>
               )}
 
-              {/* Row 6: Cheque re-issue (-) */}
+              {/* Optional Cheque Reissue (-) */}
               {reportData.calculation.cheque_reissue_cents > 0 && (
                 <div className="flex justify-between items-baseline py-0.5">
-                  <span>(-) චෙක්පත් නැවත නිකුතුව</span>
+                  <span>(-)චෙක්පතක් නැවත නිකුතුව</span>
                   <span className="font-mono font-medium">{fmt(reportData.calculation.cheque_reissue_cents)}</span>
                 </div>
               )}
 
-              {/* Row 7: Bank charges (-) */}
-              {reportData.calculation.bank_charges_cents > 0 && (
-                <div className="flex justify-between items-baseline py-0.5">
-                  <span>(-) බැංකු අමතර ගාස්තු</span>
-                  <span className="font-mono font-medium">{fmt(reportData.calculation.bank_charges_cents)}</span>
-                </div>
-              )}
+              {/* Row 5: Cheque return / bounce fee (-) (matching Image 2) */}
+              <div className="flex justify-between items-baseline py-0.5">
+                <span>(-)චෙක් අගරු ගාස්තු</span>
+                <span className="font-mono font-medium">{fmt(reportData.calculation.bank_charges_cents || 0)}</span>
+              </div>
 
-              {/* Row 8: Petty Cash in hand balance (-) */}
-              {reportData.calculation.petty_cash_balance_cents > 0 && (
-                <div className="flex justify-between items-baseline py-0.5">
-                  <span>(-) සුළු මුදල් අත ඉතිරිය</span>
-                  <span className="font-mono font-medium">{fmt(reportData.calculation.petty_cash_balance_cents)}</span>
-                </div>
-              )}
+              {/* Row 6: Petty cash balance on hand (-) (matching Image 2) */}
+              <div className="flex justify-between items-baseline py-0.5">
+                <span>(-)සුළු මුදල් අත ඉතිරිය</span>
+                <span className="font-mono font-medium">{fmt(reportData.calculation.petty_cash_balance_cents || 0)}</span>
+              </div>
 
               {/* Final Double-line Separator */}
               <div className="border-b-2 border-zinc-900 pt-1" />
@@ -1264,7 +1237,7 @@ export const PeriodicFinancialStatementView: React.FC<PeriodicFinancialStatement
               placeholder="Auto-calculated from ledger if blank"
             />
             <Input
-              label="(+) අනෙකුත් තැන්පතු / Other Deposits (LKR)"
+              label="(+) අගරු චෙක් / Bounced Cheque Total (LKR)"
               type="number"
               step="0.01"
               value={adjOtherAdditions}
@@ -1272,23 +1245,7 @@ export const PeriodicFinancialStatementView: React.FC<PeriodicFinancialStatement
               placeholder="0.00"
             />
             <Input
-              label="(-) ආපනශාලා තැන්පතු ආපසු ගෙවුම් / Canteen Refunds (LKR)"
-              type="number"
-              step="0.01"
-              value={adjCanteenRefund}
-              onChange={(e) => setAdjCanteenRefund(e.target.value)}
-              placeholder="0.00"
-            />
-            <Input
-              label="(-) චෙක්පත් නැවත නිකුතුව / Cheque Re-issues (LKR)"
-              type="number"
-              step="0.01"
-              value={adjChequeReissue}
-              onChange={(e) => setAdjChequeReissue(e.target.value)}
-              placeholder="0.00"
-            />
-            <Input
-              label="(-) බැංකු අමතර ගාස්තු / Bank Charges (LKR)"
+              label="(-) චෙක් අගරු ගාස්තු / Cheque Return Fee (LKR)"
               type="number"
               step="0.01"
               value={adjBankCharges}
@@ -1301,6 +1258,22 @@ export const PeriodicFinancialStatementView: React.FC<PeriodicFinancialStatement
               step="0.01"
               value={adjPettyCashBal}
               onChange={(e) => setAdjPettyCashBal(e.target.value)}
+              placeholder="0.00"
+            />
+            <Input
+              label="(-) ආපනශාලා තැන්පතු ආපසු ගෙවීම් / Canteen Refunds (LKR)"
+              type="number"
+              step="0.01"
+              value={adjCanteenRefund}
+              onChange={(e) => setAdjCanteenRefund(e.target.value)}
+              placeholder="0.00"
+            />
+            <Input
+              label="(-) චෙක්පත් නැවත නිකුතුව / Cheque Re-issues (LKR)"
+              type="number"
+              step="0.01"
+              value={adjChequeReissue}
+              onChange={(e) => setAdjChequeReissue(e.target.value)}
               placeholder="0.00"
             />
             <Input
