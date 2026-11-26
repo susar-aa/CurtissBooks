@@ -337,17 +337,20 @@ console.log('✓ Automatic category transaction discovery & display verified cle
 
 // --- TEST 9: VERIFY BOUNCED CHEQUE TOTAL & FEE AUTO-DETECTION ---
 console.log('--- TEST 9: VERIFY BOUNCED CHEQUE TOTAL & FEE AUTO-DETECTION ---');
-// Insert a bounced cheque in 3rd period
-db.prepare(`
-  INSERT INTO cheques (cheque_type, cheque_number, amount_cents, status, cheque_date, bounce_date, bounce_reason)
-  VALUES ('received', 'CHQ-BOUNCE-99', 1000000, 'bounced', '2026-09-05', '2026-09-15', 'Insufficient Funds')
-`).run();
-
-// Insert a bank bounce fee in bank_transactions
-db.prepare(`
-  INSERT INTO bank_transactions (bank_account_id, transaction_date, transaction_type, amount_cents, description, is_reconciled)
-  VALUES (?, '2026-09-16', 'bank_charge', -50000, 'Cheque return fee / චෙක් අගරු ගාස්තු', 0)
+// 1. Insert an issued cheque that bounces with a 500 fee (matching user's exact case)
+const issChqRes = db.prepare(`
+  INSERT INTO cheques (cheque_type, cheque_number, amount_cents, status, cheque_date, issuing_bank_account_id)
+  VALUES ('issued', 'CHQ-546123', 100000, 'issued', '2026-11-25', ?)
 `).run(bank.id);
+const issChqId = Number(issChqRes.lastInsertRowid);
+
+// Bounce it using FinancialService.bounceIssuedCheque with bounce_fee_cents: 50000
+FinancialService.bounceIssuedCheque({
+  cheque_id: issChqId,
+  bounce_date: '2026-11-26',
+  bounce_reason: 'Insufficient funds',
+  bounce_fee_cents: 50000,
+}, 1);
 
 const rep3 = FinancialService.getPeriodicStatementReport({
   financialYearId: fyId,
@@ -356,9 +359,11 @@ const rep3 = FinancialService.getPeriodicStatementReport({
   endDate: '2026-12-31',
 });
 
-assert.strictEqual(rep3.calculation.other_additions_cents, 1000000, 'Auto-detected bounced cheque total: Rs. 10,000.00');
-assert.strictEqual(rep3.calculation.bank_charges_cents, 50000, 'Auto-detected cheque bounce fee: Rs. 500.00');
-console.log('✓ Bounced cheque total Rs. 10,000.00 and fee Rs. 500.00 auto-detected correctly matching sample document.\n');
+// The bounced cheque amount (Rs. 1,000.00) is added under (+)අගරු චෙක්
+assert.strictEqual(rep3.calculation.other_additions_cents, 100000, 'Bounced cheque total: Rs. 1,000.00');
+// The bank fee (Rs. 500.00) is deducted under (-)චෙක් අගරු ගාස්තු (NOT 1,000.00 from the reversal transaction!)
+assert.strictEqual(rep3.calculation.bank_charges_cents, 50000, 'Cheque bounce fee is strictly Rs. 500.00 (not confused with Rs. 1,000.00 reversal)');
+console.log('✓ Issued cheque bounce amount Rs. 1,000.00 and fee Rs. 500.00 accurately isolated without reversal collision.\n');
 
 console.log('================================================================');
 console.log('>>> ALL PERIODIC FINANCIAL STATEMENT TESTS PASSED CLEANLY! <<<');

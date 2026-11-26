@@ -464,6 +464,7 @@ export interface ChequeRecord {
   actual_clearance_date?: string | null;
   bounce_date?: string | null;
   bounce_reason?: string | null;
+  bounce_fee_cents?: number | null;
   cancellation_date?: string | null;
   cancellation_reason?: string | null;
 

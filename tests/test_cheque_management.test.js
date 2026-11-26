@@ -16,50 +16,11 @@ const db = new Database(testDbPath);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
-// Load migrations 001 to 016
-const { migration001 } = require('../dist/main/db/migrations/001_initial_settings');
-const { migration002 } = require('../dist/main/db/migrations/002_auth_and_rbac');
-const { migration003 } = require('../dist/main/db/migrations/003_school_and_students');
-const { migration004 } = require('../dist/main/db/migrations/004_db_corrections_and_finalization');
-const { migration005 } = require('../dist/main/db/migrations/005_financial_accounting_system');
-const { migration006 } = require('../dist/main/db/migrations/006_budget_workflow_refinement');
-const { migration007 } = require('../dist/main/db/migrations/007_single_active_fy_and_category_filtering');
-const { migration008 } = require('../dist/main/db/migrations/008_funding_system_upgrade');
-const { migration009 } = require('../dist/main/db/migrations/009_streamline_funding_inflows');
-const { migration010 } = require('../dist/main/db/migrations/010_financial_system_upgrades');
-const { migration011 } = require('../dist/main/db/migrations/011_fund_transfers');
-const { migration012 } = require('../dist/main/db/migrations/012_fund_category_receipt_selection');
-const { migration013 } = require('../dist/main/db/migrations/013_financial_year_optimization');
-const { migration014 } = require('../dist/main/db/migrations/014_budget_reallocations');
-const { migration015 } = require('../dist/main/db/migrations/015_donation_categories');
-const { migration016 } = require('../dist/main/db/migrations/016_cheque_management');
+// Load migrations using migrationRunner
+const { runMigrations } = require('../dist/main/db/migrationRunner');
+runMigrations(db);
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS schema_migrations (
-    id INTEGER PRIMARY KEY,
-    name TEXT NOT NULL UNIQUE,
-    applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-`);
-
-const migrations = [
-  migration001, migration002, migration003, migration004,
-  migration005, migration006, migration007, migration008,
-  migration009, migration010, migration011, migration012,
-  migration013, migration014, migration015, migration016
-];
-
-for (const m of migrations) {
-  db.pragma('foreign_keys = OFF');
-  const tx = db.transaction(() => {
-    m.up(db);
-    db.prepare('INSERT INTO schema_migrations (id, name) VALUES (?, ?)').run(m.id, m.name);
-  });
-  tx();
-  db.pragma('foreign_keys = ON');
-}
-
-console.log('✓ All 16 migrations applied cleanly to isolated test database.');
+console.log('✓ All migrations applied cleanly to isolated test database.');
 
 // Seed Admin User
 const { CryptoService } = require('../dist/main/services/cryptoService');

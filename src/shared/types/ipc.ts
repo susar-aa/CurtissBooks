@@ -182,12 +182,12 @@ export interface ElectronAPI {
     recordReceivedCheque: (data: any) => Promise<IpcResult<ChequeRecord>>;
     depositReceivedCheque: (data: { cheque_id: number; deposit_bank_account_id: number; actual_deposit_date: string; deposit_reference?: string; financial_year_id?: number }) => Promise<IpcResult<ChequeRecord>>;
     clearReceivedCheque: (data: { cheque_id: number; actual_clearance_date: string; notes?: string }) => Promise<IpcResult<ChequeRecord>>;
-    bounceReceivedCheque: (data: { cheque_id: number; bounce_date: string; bounce_reason: string }) => Promise<IpcResult<ChequeRecord>>;
+    bounceReceivedCheque: (data: { cheque_id: number; bounce_date: string; bounce_reason: string; bounce_fee_cents?: number }) => Promise<IpcResult<ChequeRecord>>;
     cancelReceivedCheque: (data: { cheque_id: number; cancellation_reason: string }) => Promise<IpcResult<ChequeRecord>>;
     recordIssuedCheque: (data: any) => Promise<IpcResult<ChequeRecord>>;
     presentIssuedCheque: (data: { cheque_id: number; actual_presentation_date: string; notes?: string }) => Promise<IpcResult<ChequeRecord>>;
     clearIssuedCheque: (data: { cheque_id: number; actual_clearance_date: string; notes?: string }) => Promise<IpcResult<ChequeRecord>>;
-    bounceIssuedCheque: (data: { cheque_id: number; bounce_date: string; bounce_reason: string }) => Promise<IpcResult<ChequeRecord>>;
+    bounceIssuedCheque: (data: { cheque_id: number; bounce_date: string; bounce_reason: string; bounce_fee_cents?: number }) => Promise<IpcResult<ChequeRecord>>;
     cancelIssuedCheque: (data: { cheque_id: number; cancellation_reason: string }) => Promise<IpcResult<ChequeRecord>>;
 
     // Bank Reconciliation

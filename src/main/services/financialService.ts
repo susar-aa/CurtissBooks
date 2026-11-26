@@ -4758,6 +4758,7 @@ export class FinancialService {
     cheque_id: number;
     bounce_date: string;
     bounce_reason: string;
+    bounce_fee_cents?: number;
   }, userId?: number): ChequeRecord {
     const db = getDatabase();
 
@@ -4769,6 +4770,7 @@ export class FinancialService {
 
     const bounceDate = data.bounce_date?.trim();
     const reason = data.bounce_reason?.trim();
+    const bounceFeeCents = Math.max(0, Number(data.bounce_fee_cents || 0));
     if (!bounceDate) throw new Error('Bounce date is required.');
     if (!reason) throw new Error('Bounce reason is required.');
 
@@ -4802,6 +4804,31 @@ export class FinancialService {
         `).run(cheque.amount_cents, cheque.deposit_bank_account_id);
       }
 
+      // If bounce fee exists, deduct from bank account and record bank_charge transaction
+      if (bounceFeeCents > 0 && cheque.deposit_bank_account_id) {
+        db.prepare(`
+          INSERT INTO bank_transactions (
+            bank_account_id, transaction_date, transaction_type, amount_cents,
+            reference_no, cheque_number, payee_or_payer, description, is_reconciled, created_by
+          ) VALUES (?, ?, 'bank_charge', ?, ?, ?, ?, ?, 0, ?)
+        `).run(
+          cheque.deposit_bank_account_id,
+          bounceDate,
+          -bounceFeeCents,
+          `FEE-CHQ-${cheque.cheque_number}`,
+          cheque.cheque_number,
+          cheque.payer_name,
+          `Cheque return fee / චෙක් අගරු ගාස්තු: #${cheque.cheque_number}`,
+          userId || null
+        );
+
+        db.prepare(`
+          UPDATE bank_accounts
+          SET current_balance_cents = current_balance_cents - ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(bounceFeeCents, cheque.deposit_bank_account_id);
+      }
+
       // If a fund receipt was recorded, mark it as reversed/cancelled
       if (cheque.fund_receipt_id) {
         db.prepare(`
@@ -4817,10 +4844,11 @@ export class FinancialService {
         SET status = 'bounced',
             bounce_date = ?,
             bounce_reason = ?,
+            bounce_fee_cents = ?,
             bounce_bank_transaction_id = ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-      `).run(bounceDate, reason, revBtId, cheque.id);
+      `).run(bounceDate, reason, bounceFeeCents, revBtId, cheque.id);
 
       db.prepare(`
         INSERT INTO cheque_audit_logs (cheque_id, action, from_status, to_status, notes, created_by)
@@ -5192,6 +5220,7 @@ export class FinancialService {
     cheque_id: number;
     bounce_date: string;
     bounce_reason: string;
+    bounce_fee_cents?: number;
   }, userId?: number): ChequeRecord {
     const db = getDatabase();
 
@@ -5203,6 +5232,7 @@ export class FinancialService {
 
     const bounceDate = data.bounce_date?.trim();
     const reason = data.bounce_reason?.trim();
+    const bounceFeeCents = Math.max(0, Number(data.bounce_fee_cents || 0));
     if (!bounceDate) throw new Error('Bounce date is required.');
     if (!reason) throw new Error('Bounce reason is required.');
 
@@ -5236,6 +5266,31 @@ export class FinancialService {
         `).run(cheque.amount_cents, cheque.issuing_bank_account_id);
       }
 
+      // If bounce fee exists, deduct from bank account and record bank_charge transaction
+      if (bounceFeeCents > 0 && cheque.issuing_bank_account_id) {
+        db.prepare(`
+          INSERT INTO bank_transactions (
+            bank_account_id, transaction_date, transaction_type, amount_cents,
+            reference_no, cheque_number, payee_or_payer, description, is_reconciled, created_by
+          ) VALUES (?, ?, 'bank_charge', ?, ?, ?, ?, ?, 0, ?)
+        `).run(
+          cheque.issuing_bank_account_id,
+          bounceDate,
+          -bounceFeeCents,
+          `FEE-CHQ-${cheque.cheque_number}`,
+          cheque.cheque_number,
+          cheque.payee_name,
+          `Cheque return fee / චෙක් අගරු ගාස්තු: #${cheque.cheque_number}`,
+          userId || null
+        );
+
+        db.prepare(`
+          UPDATE bank_accounts
+          SET current_balance_cents = current_balance_cents - ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(bounceFeeCents, cheque.issuing_bank_account_id);
+      }
+
       // 2. Restore linked expense to unpaid status so liability is restored without duplication
       if (cheque.expense_id) {
         db.prepare(`
@@ -5251,10 +5306,11 @@ export class FinancialService {
         SET status = 'bounced',
             bounce_date = ?,
             bounce_reason = ?,
+            bounce_fee_cents = ?,
             bounce_bank_transaction_id = ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-      `).run(bounceDate, reason, revBtId, cheque.id);
+      `).run(bounceDate, reason, bounceFeeCents, revBtId, cheque.id);
 
       db.prepare(`
         INSERT INTO cheque_audit_logs (cheque_id, action, from_status, to_status, notes, created_by)
@@ -7175,21 +7231,34 @@ export class FinancialService {
     `).get(startDate, endDate, startDate, endDate) as any;
     const autoBouncedCents = Number(bouncedRes?.bounced_sum || 0);
 
-    // Auto-detect bank charges / cheque return fee during the period
+    // Auto-detect bank charges during the period (strictly EXCLUDING cheque amount reversals)
     const chargesRes = db.prepare(`
       SELECT COALESCE(SUM(ABS(amount_cents)), 0) as charges
       FROM bank_transactions
       WHERE transaction_date >= ? AND transaction_date <= ?
-        AND (
-          transaction_type = 'bank_charge'
-          OR description LIKE '%charge%'
-          OR description LIKE '%fee%'
-          OR description LIKE '%bounce%'
-          OR description LIKE '%return%'
-          OR description LIKE '%අගරු%'
-        )
+        AND transaction_type = 'bank_charge'
+        AND reference_no NOT LIKE 'REV-%'
     `).get(startDate, endDate) as any;
-    const autoChargesCents = Number(chargesRes?.charges || 0);
+    const txChargesCents = Number(chargesRes?.charges || 0);
+
+    // Also auto-detect bounce fees recorded on bounced cheques during the period
+    const chqFeesRes = db.prepare(`
+      SELECT COALESCE(SUM(
+        CASE
+          WHEN bounce_fee_cents > 0 THEN bounce_fee_cents
+          WHEN CAST(bounce_reason AS INTEGER) > 0 THEN CAST(bounce_reason AS INTEGER) * 100
+          ELSE 0
+        END
+      ), 0) as chq_fees
+      FROM cheques
+      WHERE status = 'bounced'
+        AND ((bounce_date IS NOT NULL AND bounce_date >= ? AND bounce_date <= ?)
+             OR (bounce_date IS NULL AND cheque_date >= ? AND cheque_date <= ?))
+    `).get(startDate, endDate, startDate, endDate) as any;
+    const chqFeesCents = Number(chqFeesRes?.chq_fees || 0);
+
+    // Take max to avoid double-counting if a bank_charge transaction was also recorded for the cheque
+    const autoChargesCents = Math.max(txChargesCents, chqFeesCents);
 
     // Auto-detect petty cash balance remaining at period end
     const pcBalRes = db.prepare(`

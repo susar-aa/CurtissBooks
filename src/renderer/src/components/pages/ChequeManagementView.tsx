@@ -100,6 +100,7 @@ export const ChequeManagementView: React.FC<ChequeManagementViewProps> = ({
   const [actionType, setActionType] = useState<'cleared' | 'bounced' | 'cancelled'>('cleared');
   const [actionDate, setActionDate] = useState(new Date().toISOString().split('T')[0]);
   const [actionReason, setActionReason] = useState('');
+  const [actionBounceFee, setActionBounceFee] = useState('');
   const [actionBankId, setActionBankId] = useState<number | null>(null);
   const [submittingAction, setSubmittingAction] = useState(false);
 
@@ -375,6 +376,7 @@ export const ChequeManagementView: React.FC<ChequeManagementViewProps> = ({
     setActionType(type);
     setActionDate(new Date().toISOString().split('T')[0]);
     setActionReason('');
+    setActionBounceFee(cheque.bounce_fee_cents ? (cheque.bounce_fee_cents / 100).toString() : '');
     setActionBankId(cheque.deposit_bank_account_id || (bankAccounts.length > 0 ? bankAccounts[0].id : null));
     setActionModalOpen(true);
   };
@@ -404,10 +406,12 @@ export const ChequeManagementView: React.FC<ChequeManagementViewProps> = ({
             notes: actionReason.trim() || undefined,
           });
         } else if (actionType === 'bounced') {
+          const bounceFeeCents = actionBounceFee.trim() ? Math.round(parseFloat(actionBounceFee) * 100) : 0;
           res = await api.bounceReceivedCheque({
             cheque_id: selectedCheque.id,
             bounce_date: actionDate,
             bounce_reason: actionReason.trim(),
+            bounce_fee_cents: bounceFeeCents,
           });
         } else if (actionType === 'cancelled') {
           res = await api.cancelReceivedCheque({
@@ -423,10 +427,12 @@ export const ChequeManagementView: React.FC<ChequeManagementViewProps> = ({
             notes: actionReason.trim() || undefined,
           });
         } else if (actionType === 'bounced') {
+          const bounceFeeCents = actionBounceFee.trim() ? Math.round(parseFloat(actionBounceFee) * 100) : 0;
           res = await api.bounceIssuedCheque({
             cheque_id: selectedCheque.id,
             bounce_date: actionDate,
             bounce_reason: actionReason.trim(),
+            bounce_fee_cents: bounceFeeCents,
           });
         } else if (actionType === 'cancelled') {
           res = await api.cancelIssuedCheque({
@@ -989,9 +995,18 @@ export const ChequeManagementView: React.FC<ChequeManagementViewProps> = ({
                     {/* Status Badge */}
                     <td className="px-4 py-3">
                       {getStatusBadge(c.status)}
-                      {c.status === 'bounced' && c.bounce_reason && (
-                        <div className="text-[10px] text-red-600 dark:text-red-400 mt-1 max-w-[160px] truncate" title={c.bounce_reason}>
-                          {c.bounce_reason}
+                      {c.status === 'bounced' && (
+                        <div className="space-y-0.5 mt-1">
+                          {((c.bounce_fee_cents && c.bounce_fee_cents > 0) || (c.bounce_reason && !isNaN(parseFloat(c.bounce_reason)))) && (
+                            <div className="text-[11px] font-semibold text-red-600 dark:text-red-400">
+                              Fee: Rs. {formatLKR(c.bounce_fee_cents || Math.round(parseFloat(c.bounce_reason!) * 100))}
+                            </div>
+                          )}
+                          {c.bounce_reason && isNaN(parseFloat(c.bounce_reason)) && (
+                            <div className="text-[10px] text-zinc-500 max-w-[160px] truncate" title={c.bounce_reason}>
+                              {c.bounce_reason}
+                            </div>
+                          )}
                         </div>
                       )}
                     </td>
@@ -1618,6 +1633,22 @@ export const ChequeManagementView: React.FC<ChequeManagementViewProps> = ({
                   onChange={(e) => setActionReason(e.target.value)}
                   placeholder="e.g. Insufficient funds / Payment stopped / Incorrect signature"
                   required
+                />
+              </div>
+            )}
+
+            {actionType === 'bounced' && (
+              <div>
+                <label className="block text-zinc-700 dark:text-zinc-300 font-medium mb-1">
+                  Cheque Return Fee / අගරු ගාස්තුව (LKR)
+                </label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={actionBounceFee}
+                  onChange={(e) => setActionBounceFee(e.target.value)}
+                  placeholder="0.00 (e.g. 500.00)"
                 />
               </div>
             )}
