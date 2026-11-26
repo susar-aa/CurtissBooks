@@ -25,6 +25,12 @@ import {
   ChevronDown,
   Check,
   X,
+  FolderTree,
+  FolderPlus,
+  Folder,
+  Edit2,
+  Trash2,
+  CornerDownRight,
 } from 'lucide-react';
 import { PageHeader } from '../ui/PageHeader';
 import { Button } from '../ui/Button';
@@ -74,12 +80,18 @@ export const FundManagementView: React.FC = () => {
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [catManageModalOpen, setCatManageModalOpen] = useState(false);
 
-  // Category Manage Form State
+  // Category Manage Form State (Main Category vs Subcategory Hierarchy)
+  const [catLevel, setCatLevel] = useState<'main' | 'sub'>('main');
+  const [catParentId, setCatParentId] = useState<number | null>(null);
   const [catCode, setCatCode] = useState('');
   const [catNameEn, setCatNameEn] = useState('');
   const [catNameSi, setCatNameSi] = useState('');
   const [catDesc, setCatDesc] = useState('');
+  const [editingCat, setEditingCat] = useState<FundCategory | null>(null);
+  const [collapsedGroupIds, setCollapsedGroupIds] = useState<Record<number, boolean>>({});
+  const [catManageSearch, setCatManageSearch] = useState('');
   const [savingCat, setSavingCat] = useState(false);
+  const [deletingCatId, setDeletingCatId] = useState<number | null>(null);
 
   // Record Inward Donation Form State
   const [rcptCatId, setRcptCatId] = useState<number>(1);
@@ -103,6 +115,9 @@ export const FundManagementView: React.FC = () => {
   const [catDropdownOpen, setCatDropdownOpen] = useState(false);
   const [highlightedCatIndex, setHighlightedCatIndex] = useState(0);
   const [quickCreateModalOpen, setQuickCreateModalOpen] = useState(false);
+  const [quickCatLevel, setQuickCatLevel] = useState<'main' | 'sub'>('main');
+  const [quickCatParentId, setQuickCatParentId] = useState<number | null>(null);
+  const [quickCatCode, setQuickCatCode] = useState('');
   const [quickCatNameEn, setQuickCatNameEn] = useState('');
   const [quickCatNameSi, setQuickCatNameSi] = useState('');
   const [quickCatDesc, setQuickCatDesc] = useState('');
@@ -285,17 +300,120 @@ export const FundManagementView: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [catDropdownOpen]);
 
-  // Open Quick-Create Modal and prompt for English & Sinhala terms
-  const openQuickCreateModal = (prefillName: string = '') => {
+  // Main categories and hierarchical grouping
+  const mainCategories = useMemo(() => {
+    return fundCategories.filter((c) => !c.parent_id);
+  }, [fundCategories]);
+
+  const categoryGroups = useMemo(() => {
+    const groups: Array<{
+      main: FundCategory;
+      subs: FundCategory[];
+      totalReceipts: number;
+      totalReceivedCents: number;
+    }> = [];
+
+    const mainCats = fundCategories.filter((c) => !c.parent_id);
+    const subCats = fundCategories.filter((c) => Boolean(c.parent_id));
+
+    mainCats.forEach((main) => {
+      const subs = subCats.filter((s) => s.parent_id === main.id);
+      const subReceipts = subs.reduce((acc, s) => acc + (s.receipt_count || 0), 0);
+      const subCents = subs.reduce((acc, s) => acc + (s.total_received_cents || 0), 0);
+      groups.push({
+        main,
+        subs,
+        totalReceipts: (main.receipt_count || 0) + subReceipts,
+        totalReceivedCents: (main.total_received_cents || 0) + subCents,
+      });
+    });
+
+    const orphanSubs = subCats.filter((s) => !mainCats.some((m) => m.id === s.parent_id));
+    if (orphanSubs.length > 0) {
+      groups.push({
+        main: {
+          id: -1,
+          category_code: 'OTHER',
+          name_en: 'Other Categories',
+          name_si: 'වෙනත් ප්‍රවර්ග',
+          is_active: true,
+        },
+        subs: orphanSubs,
+        totalReceipts: orphanSubs.reduce((acc, s) => acc + (s.receipt_count || 0), 0),
+        totalReceivedCents: orphanSubs.reduce((acc, s) => acc + (s.total_received_cents || 0), 0),
+      });
+    }
+
+    return groups;
+  }, [fundCategories]);
+
+  const fetchSuggestedCatCode = async (level: 'main' | 'sub', parentId?: number | null) => {
+    if (window.curtissApi?.financial?.suggestFundCategoryCode) {
+      try {
+        const targetParent = level === 'sub' ? parentId : null;
+        const res = await window.curtissApi.financial.suggestFundCategoryCode(targetParent);
+        if (res.success && res.data) {
+          setCatCode(res.data);
+        }
+      } catch (e) {}
+    }
+  };
+
+  const handleSelectLevel = async (level: 'main' | 'sub', defaultParentId?: number | null) => {
+    setCatLevel(level);
+    const pId = level === 'sub' ? (defaultParentId || (mainCategories[0]?.id ?? null)) : null;
+    setCatParentId(pId);
+    if (!editingCat) {
+      await fetchSuggestedCatCode(level, pId);
+    }
+  };
+
+  const handleStartEditCategory = (cat: FundCategory) => {
+    setEditingCat(cat);
+    setCatCode(cat.category_code || '');
+    setCatNameEn(cat.name_en || '');
+    setCatNameSi(cat.name_si || '');
+    setCatDesc(cat.description || '');
+    if (cat.parent_id) {
+      setCatLevel('sub');
+      setCatParentId(cat.parent_id);
+    } else {
+      setCatLevel('main');
+      setCatParentId(null);
+    }
+  };
+
+  const handleCancelEditCategory = () => {
+    setEditingCat(null);
+    setCatCode('');
+    setCatNameEn('');
+    setCatNameSi('');
+    setCatDesc('');
+    setCatLevel('main');
+    setCatParentId(null);
+  };
+
+  // Open Quick-Create Modal and prompt for English & Sinhala terms and level
+  const openQuickCreateModal = async (prefillName: string = '') => {
     const trimmed = prefillName.trim();
     setQuickCatNameEn(trimmed);
     setQuickCatNameSi('');
     setQuickCatDesc('');
+    const defaultParent = mainCategories[0]?.id || null;
+    const defaultLevel = defaultParent ? 'sub' : 'main';
+    setQuickCatLevel(defaultLevel);
+    setQuickCatParentId(defaultParent);
+    if (window.curtissApi?.financial?.suggestFundCategoryCode) {
+      try {
+        const cRes = await window.curtissApi.financial.suggestFundCategoryCode(defaultLevel === 'sub' ? defaultParent : null);
+        if (cRes.success && cRes.data) setQuickCatCode(cRes.data);
+      } catch (e) {}
+    }
     setCatDropdownOpen(false);
     setQuickCreateModalOpen(true);
   };
 
-  // Detailed Quick Create with English name, Sinhala term, and Description
+  // Detailed Quick Create with English name, Sinhala term, Parent, and Code
   const handleConfirmDetailedQuickCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanEn = quickCatNameEn.trim();
@@ -312,14 +430,17 @@ export const FundManagementView: React.FC = () => {
     setQuickCreatingCat(true);
     try {
       if (window.curtissApi?.financial?.createFundCategory) {
+        const targetParent = quickCatLevel === 'sub' ? quickCatParentId : null;
         const res = await window.curtissApi.financial.createFundCategory({
+          category_code: quickCatCode.trim() || undefined,
           name_en: cleanEn,
           name_si: cleanSi,
+          parent_id: targetParent,
           description: quickCatDesc.trim() || undefined,
         });
 
         if (res.success && res.data) {
-          success('Category Created', `"${res.data.name_en}" created and selected.`);
+          success('Category Created', `"${res.data.name_en}" (${res.data.category_code}) created and selected.`);
           await loadData();
           setRcptCatId(res.data.id);
           setQuickCreateModalOpen(false);
@@ -339,39 +460,90 @@ export const FundManagementView: React.FC = () => {
     }
   };
 
-  // Create Fund Category
-  const handleCreateCategory = async (e: React.FormEvent) => {
+  // Create or Update Fund Category
+  const handleSaveCategory = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!catNameEn.trim()) {
-      toastError('Validation Error', 'Category name is required.');
+    const cleanEn = catNameEn.trim();
+    const cleanSi = catNameSi.trim() || cleanEn;
+    if (!cleanEn) {
+      toastError('Validation Error', 'Category English name is required.');
+      return;
+    }
+    if (catLevel === 'sub' && !catParentId) {
+      toastError('Validation Error', 'Please select a Main Parent Category for this subcategory.');
       return;
     }
 
     setSavingCat(true);
     try {
-      if (window.curtissApi?.financial?.createFundCategory) {
-        const res = await window.curtissApi.financial.createFundCategory({
-          category_code: catCode.trim() || undefined,
-          name_en: catNameEn.trim(),
-          name_si: catNameSi.trim() || catNameEn.trim(),
-          description: catDesc.trim() || undefined,
-        });
+      if (editingCat) {
+        if (window.curtissApi?.financial?.updateFundCategory) {
+          const res = await window.curtissApi.financial.updateFundCategory(editingCat.id, {
+            category_code: catCode.trim() || undefined,
+            name_en: cleanEn,
+            name_si: cleanSi,
+            parent_id: catLevel === 'sub' ? catParentId : null,
+            description: catDesc.trim() || undefined,
+          });
 
-        if (res.success) {
-          success('Category Registered', `Category "${catNameEn.trim()}" created successfully.`);
-          setCatCode('');
-          setCatNameEn('');
-          setCatNameSi('');
-          setCatDesc('');
-          loadData();
-        } else {
-          toastError('Failed to create category', res.error);
+          if (res.success) {
+            success('Category Updated', `Category "${cleanEn}" updated successfully.`);
+            handleCancelEditCategory();
+            loadData();
+          } else {
+            toastError('Failed to update category', res.error);
+          }
+        }
+      } else {
+        if (window.curtissApi?.financial?.createFundCategory) {
+          const res = await window.curtissApi.financial.createFundCategory({
+            category_code: catCode.trim() || undefined,
+            name_en: cleanEn,
+            name_si: cleanSi,
+            parent_id: catLevel === 'sub' ? catParentId : null,
+            description: catDesc.trim() || undefined,
+          });
+
+          if (res.success) {
+            success('Category Registered', `Category "${cleanEn}" (${res.data?.category_code}) created successfully.`);
+            setCatNameEn('');
+            setCatNameSi('');
+            setCatDesc('');
+            fetchSuggestedCatCode(catLevel, catParentId);
+            loadData();
+          } else {
+            toastError('Failed to create category', res.error);
+          }
         }
       }
     } catch (err: any) {
       toastError('Error', err.message);
     } finally {
       setSavingCat(false);
+    }
+  };
+
+  // Delete Category Safely
+  const handleDeleteCategory = async (cat: FundCategory) => {
+    if (!window.confirm(`Are you sure you want to permanently delete category "${cat.name_en}" (${cat.category_code})?`)) {
+      return;
+    }
+    setDeletingCatId(cat.id);
+    try {
+      if (window.curtissApi?.financial?.deleteFundCategory) {
+        const res = await window.curtissApi.financial.deleteFundCategory(cat.id);
+        if (res.success) {
+          success('Category Deleted', `Category "${cat.name_en}" removed successfully.`);
+          if (editingCat?.id === cat.id) handleCancelEditCategory();
+          loadData();
+        } else {
+          toastError('Cannot Delete Category', res.error);
+        }
+      }
+    } catch (err: any) {
+      toastError('Error Deleting Category', err.message);
+    } finally {
+      setDeletingCatId(null);
     }
   };
 
@@ -560,63 +732,124 @@ export const FundManagementView: React.FC = () => {
         </div>
       </div>
 
-      {/* Category Pills & Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-zinc-50/50 dark:bg-zinc-900/30 p-2.5 rounded-xl border border-zinc-200/60 dark:border-zinc-800/60">
-        <div className="flex items-center space-x-1.5 overflow-x-auto max-w-full pb-0.5">
-          <button
-            onClick={() => {
-              setSelectedCatId(null);
-              setReceiptsPage(1);
-            }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all whitespace-nowrap ${
-              selectedCatId === null
-                ? 'bg-zinc-900 text-white border-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 shadow-sm'
-                : 'bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300'
-            }`}
-          >
-            All Categories ({summary.total_count})
-          </button>
+      {/* Category Pills & Filter Bar (Main Categories & Granular Subcategory Drilldown) */}
+      <div className="space-y-2 bg-zinc-50/50 dark:bg-zinc-900/30 p-2.5 rounded-xl border border-zinc-200/60 dark:border-zinc-800/60">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center space-x-1.5 overflow-x-auto max-w-full pb-0.5">
+            <button
+              onClick={() => {
+                setSelectedCatId(null);
+                setReceiptsPage(1);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all whitespace-nowrap ${
+                selectedCatId === null
+                  ? 'bg-zinc-900 text-white border-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 shadow-sm'
+                  : 'bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300'
+              }`}
+            >
+              All Categories ({summary.total_count})
+            </button>
 
-          {fundCategories.map((cat) => {
-            const isSel = selectedCatId === cat.id;
-            return (
+            {categoryGroups.map((group) => {
+              const main = group.main;
+              const isMainSelected = selectedCatId === main.id || group.subs.some((s) => s.id === selectedCatId);
+              return (
+                <button
+                  key={main.id}
+                  onClick={() => {
+                    setSelectedCatId(main.id);
+                    setReceiptsPage(1);
+                  }}
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all whitespace-nowrap ${
+                    isMainSelected
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                      : 'bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300'
+                  }`}
+                >
+                  {main.category_code && (
+                    <span className={`px-1.5 py-0.2 rounded font-mono text-[10px] font-bold ${isMainSelected ? 'bg-blue-700 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'}`}>
+                      {main.category_code}
+                    </span>
+                  )}
+                  <span>{i18n.language === 'si' && main.name_si ? main.name_si : main.name_en}</span>
+                  {group.totalReceivedCents > 0 && (
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${isMainSelected ? 'bg-blue-800 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'}`}>
+                      Rs. {(group.totalReceivedCents / 100).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Live Search */}
+          <div className="relative w-full sm:w-72 flex-shrink-0">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+            <input
+              type="text"
+              value={receiptSearch}
+              onChange={(e) => {
+                setReceiptSearch(e.target.value);
+                setReceiptsPage(1);
+              }}
+              placeholder="Search donor, receipt no, purpose..."
+              className="w-full h-8 pl-8 pr-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+
+        {/* Subcategory Drilldown Pills for Selected Main Category */}
+        {(() => {
+          if (!selectedCatId) return null;
+          const activeGroup = categoryGroups.find(
+            (g) => g.main.id === selectedCatId || g.subs.some((s) => s.id === selectedCatId)
+          );
+          if (!activeGroup || activeGroup.subs.length === 0) return null;
+
+          return (
+            <div className="flex items-center space-x-1.5 overflow-x-auto pt-1.5 border-t border-zinc-200/60 dark:border-zinc-800/60 text-[11px]">
+              <span className="text-zinc-400 text-[10px] uppercase font-bold tracking-wider mr-1">Subcategories:</span>
               <button
-                key={cat.id}
                 onClick={() => {
-                  setSelectedCatId(cat.id);
+                  setSelectedCatId(activeGroup.main.id);
                   setReceiptsPage(1);
                 }}
-                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all whitespace-nowrap ${
-                  isSel
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                    : 'bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300'
+                className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-all whitespace-nowrap ${
+                  selectedCatId === activeGroup.main.id
+                    ? 'bg-zinc-800 text-white border-zinc-800 dark:bg-zinc-200 dark:text-zinc-900'
+                    : 'bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300'
                 }`}
               >
-                <span>{i18n.language === 'si' && cat.name_si ? cat.name_si : cat.name_en}</span>
-                {cat.total_received_cents !== undefined && cat.total_received_cents > 0 && (
-                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${isSel ? 'bg-blue-700 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'}`}>
-                    Rs. {(cat.total_received_cents / 100).toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                  </span>
-                )}
+                All in {activeGroup.main.category_code}
               </button>
-            );
-          })}
-        </div>
-
-        {/* Live Search */}
-        <div className="relative w-full sm:w-72 flex-shrink-0">
-          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-          <input
-            type="text"
-            value={receiptSearch}
-            onChange={(e) => {
-              setReceiptSearch(e.target.value);
-              setReceiptsPage(1);
-            }}
-            placeholder="Search donor, receipt no, purpose..."
-            className="w-full h-8 pl-8 pr-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
-        </div>
+              {activeGroup.subs.map((sub) => {
+                const isSubSel = selectedCatId === sub.id;
+                return (
+                  <button
+                    key={sub.id}
+                    onClick={() => {
+                      setSelectedCatId(sub.id);
+                      setReceiptsPage(1);
+                    }}
+                    className={`flex items-center space-x-1 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-all whitespace-nowrap ${
+                      isSubSel
+                        ? 'bg-blue-600 text-white border-blue-600 font-semibold'
+                        : 'bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300'
+                    }`}
+                  >
+                    <span className="font-mono text-[10px] opacity-75">{sub.category_code}</span>
+                    <span>{i18n.language === 'si' && sub.name_si ? sub.name_si : sub.name_en}</span>
+                    {sub.total_received_cents !== undefined && sub.total_received_cents > 0 && (
+                      <span className={`px-1 py-0.2 rounded text-[9px] font-mono ${isSubSel ? 'bg-blue-700 text-white' : 'bg-zinc-100 dark:bg-zinc-800'}`}>
+                        Rs. {(sub.total_received_cents / 100).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Receipts Ledger Card with Search & Server Pagination */}
@@ -661,9 +894,24 @@ export const FundManagementView: React.FC = () => {
                       </td>
                       <td className="py-2.5 px-3 font-mono text-zinc-500">{rcpt.receipt_date}</td>
                       <td className="py-2.5 px-3">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                          {rcpt.fund_category_name_en || 'General Donation'}
-                        </span>
+                        <div className="flex flex-col">
+                          <div className="flex items-center space-x-1.5">
+                            {rcpt.fund_category_code && (
+                              <span className="font-mono px-1.5 py-0.2 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-[10px] font-bold">
+                                {rcpt.fund_category_code}
+                              </span>
+                            )}
+                            <span className="font-semibold text-zinc-900 dark:text-zinc-100 text-xs">
+                              {i18n.language === 'si' && rcpt.fund_category_name_si ? rcpt.fund_category_name_si : (rcpt.fund_category_name_en || 'General Donation')}
+                            </span>
+                          </div>
+                          {rcpt.parent_category_name_en && (
+                            <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono pl-0.5 mt-0.5 flex items-center space-x-1">
+                              <CornerDownRight className="w-3 h-3 inline text-zinc-400" />
+                              <span>{rcpt.parent_category_code ? `${rcpt.parent_category_code} ` : ''}{i18n.language === 'si' && rcpt.parent_category_name_si ? rcpt.parent_category_name_si : rcpt.parent_category_name_en}</span>
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-2.5 px-3 font-semibold text-zinc-900 dark:text-zinc-100">
                         {rcpt.donor_or_dept}
@@ -825,18 +1073,25 @@ export const FundManagementView: React.FC = () => {
                               <div className="flex flex-col">
                                 <div className="font-semibold text-zinc-900 dark:text-zinc-100 flex items-center space-x-2">
                                   {c.category_code && (
-                                    <span className="font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-[11px]">
+                                    <span className="font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-[11px] font-bold">
                                       {c.category_code}
                                     </span>
                                   )}
                                   <span>{i18n.language === 'si' && c.name_si ? c.name_si : c.name_en}</span>
                                   {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 inline ml-1" />}
                                 </div>
-                                {c.name_si && c.name_en && (
-                                  <div className="text-[11px] text-zinc-500 font-sinhala mt-0.5">
-                                    {i18n.language === 'si' ? c.name_en : c.name_si}
-                                  </div>
-                                )}
+                                <div className="flex items-center space-x-2 text-[10px] text-zinc-400 mt-0.5">
+                                  {c.parent_name_en ? (
+                                    <span>↳ {c.parent_code} {c.parent_name_en}</span>
+                                  ) : (
+                                    <span className="text-blue-600 dark:text-blue-400 font-semibold uppercase text-[9px]">[Main Category]</span>
+                                  )}
+                                  {c.name_si && c.name_en && (
+                                    <span className="font-sinhala text-zinc-500">
+                                      • {i18n.language === 'si' ? c.name_en : c.name_si}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                               {c.description && (
                                 <span className="text-[11px] text-zinc-400 truncate max-w-[120px]">
@@ -884,7 +1139,7 @@ export const FundManagementView: React.FC = () => {
                       <div className="flex flex-col">
                         <div className="font-semibold text-zinc-900 dark:text-zinc-100 flex items-center space-x-2">
                           {selectedCategory.category_code && (
-                            <span className="font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-[11px]">
+                            <span className="font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-[11px] font-bold">
                               {selectedCategory.category_code}
                             </span>
                           )}
@@ -892,11 +1147,20 @@ export const FundManagementView: React.FC = () => {
                             {i18n.language === 'si' && selectedCategory.name_si ? selectedCategory.name_si : selectedCategory.name_en}
                           </span>
                         </div>
-                        {selectedCategory.name_si && selectedCategory.name_en && (
-                          <span className="text-[11px] text-zinc-500 font-sinhala mt-0.5">
-                            {i18n.language === 'si' ? selectedCategory.name_en : selectedCategory.name_si}
-                          </span>
-                        )}
+                        <div className="flex items-center space-x-2 text-[11px] text-zinc-500 mt-0.5">
+                          {selectedCategory.parent_name_en ? (
+                            <span className="font-mono">
+                              ↳ {selectedCategory.parent_code} {selectedCategory.parent_name_en}
+                            </span>
+                          ) : (
+                            <span className="text-blue-600 dark:text-blue-400 font-semibold text-[10px] uppercase">[Main Category]</span>
+                          )}
+                          {selectedCategory.name_si && selectedCategory.name_en && (
+                            <span className="font-sinhala">
+                              • {i18n.language === 'si' ? selectedCategory.name_en : selectedCategory.name_si}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     ) : (
                       <span className="text-zinc-400">Select or search category...</span>
@@ -913,10 +1177,23 @@ export const FundManagementView: React.FC = () => {
                   tabIndex={-1}
                   required
                 >
-                  {fundCategories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.category_code ? `${c.category_code} — ` : ''}{i18n.language === 'si' && c.name_si ? c.name_si : c.name_en}
-                    </option>
+                  {categoryGroups.map((g) => (
+                    <optgroup
+                      key={g.main.id}
+                      label={`${g.main.category_code ? `${g.main.category_code} — ` : ''}${g.main.name_en}`}
+                    >
+                      {g.subs.length === 0 ? (
+                        <option value={g.main.id}>
+                          {g.main.category_code ? `${g.main.category_code} — ` : ''}{g.main.name_en} ({g.main.name_si})
+                        </option>
+                      ) : (
+                        g.subs.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            &nbsp;&nbsp;{s.category_code ? `${s.category_code} — ` : ''}{s.name_en} ({s.name_si})
+                          </option>
+                        ))
+                      )}
+                    </optgroup>
                   ))}
                 </select>
               </div>
@@ -1100,27 +1377,117 @@ export const FundManagementView: React.FC = () => {
         </form>
       </Modal>
 
-      {/* Quick-Create Category Popup Modal with Sinhala Term */}
+      {/* Quick-Create Category Popup Modal with Hierarchy & Code */}
       <Modal
         isOpen={quickCreateModalOpen}
         onClose={() => setQuickCreateModalOpen(false)}
         title="Quick-Create Donation Category"
-        maxWidth="sm"
+        maxWidth="md"
         zIndex="z-[60]"
       >
         <form onSubmit={handleConfirmDetailedQuickCreate} className="space-y-3.5">
           <div className="p-2.5 rounded-lg bg-blue-50/50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/40 flex items-center space-x-2 text-xs text-blue-800 dark:text-blue-300 font-medium">
             <Sparkles className="w-4 h-4 text-blue-600 flex-shrink-0" />
-            <span>Enter the Sinhala term for this category and save.</span>
+            <span>Create a new Main Category or Subcategory with code.</span>
           </div>
 
-          <Input
-            label="Category Name (English) *"
-            value={quickCatNameEn}
-            onChange={(e) => setQuickCatNameEn(e.target.value)}
-            placeholder="e.g. Sports Sponsorship"
-            required
-          />
+          {/* Level Selection Tabs */}
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Category Level *</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  setQuickCatLevel('main');
+                  setQuickCatParentId(null);
+                  if (window.curtissApi?.financial?.suggestFundCategoryCode) {
+                    const cRes = await window.curtissApi.financial.suggestFundCategoryCode(null);
+                    if (cRes.success && cRes.data) setQuickCatCode(cRes.data);
+                  }
+                }}
+                className={`py-1.5 px-3 rounded-lg text-xs font-semibold border transition-all flex items-center justify-center space-x-1.5 ${
+                  quickCatLevel === 'main'
+                    ? 'bg-zinc-900 text-white border-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 shadow-sm'
+                    : 'bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800'
+                }`}
+              >
+                <Folder className="w-3.5 h-3.5" />
+                <span>Main Category</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  setQuickCatLevel('sub');
+                  const pId = quickCatParentId || mainCategories[0]?.id || null;
+                  setQuickCatParentId(pId);
+                  if (window.curtissApi?.financial?.suggestFundCategoryCode) {
+                    const cRes = await window.curtissApi.financial.suggestFundCategoryCode(pId);
+                    if (cRes.success && cRes.data) setQuickCatCode(cRes.data);
+                  }
+                }}
+                className={`py-1.5 px-3 rounded-lg text-xs font-semibold border transition-all flex items-center justify-center space-x-1.5 ${
+                  quickCatLevel === 'sub'
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                    : 'bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800'
+                }`}
+              >
+                <FolderTree className="w-3.5 h-3.5" />
+                <span>Subcategory</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Parent Category Selector (If Subcategory) */}
+          {quickCatLevel === 'sub' && (
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                Parent Main Category <span className="text-rose-500">*</span>
+              </label>
+              <select
+                value={quickCatParentId || ''}
+                onChange={async (e) => {
+                  const val = Number(e.target.value);
+                  setQuickCatParentId(val);
+                  if (window.curtissApi?.financial?.suggestFundCategoryCode) {
+                    const cRes = await window.curtissApi.financial.suggestFundCategoryCode(val);
+                    if (cRes.success && cRes.data) setQuickCatCode(cRes.data);
+                  }
+                }}
+                className="w-full h-9 px-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 font-medium"
+                required
+              >
+                {mainCategories.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.category_code} — {m.name_en} ({m.name_si})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Code *</label>
+              <input
+                type="text"
+                value={quickCatCode}
+                onChange={(e) => setQuickCatCode(e.target.value)}
+                placeholder="Code"
+                className="w-full h-9 px-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                required
+              />
+            </div>
+            <div className="col-span-2">
+              <Input
+                label="Category Name (English) *"
+                value={quickCatNameEn}
+                onChange={(e) => setQuickCatNameEn(e.target.value)}
+                placeholder="e.g. Sports Sponsorship"
+                required
+              />
+            </div>
+          </div>
 
           <div className="space-y-1">
             <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center justify-between">
@@ -1129,7 +1496,6 @@ export const FundManagementView: React.FC = () => {
             </label>
             <input
               type="text"
-              autoFocus
               value={quickCatNameSi}
               onChange={(e) => setQuickCatNameSi(e.target.value)}
               placeholder="උදා: ක්‍රීඩා අනුග්‍රාහක අරමුදල"
@@ -1165,88 +1531,381 @@ export const FundManagementView: React.FC = () => {
         </form>
       </Modal>
 
-      {/* Manage Reusable Donation Categories Modal */}
+      {/* Manage Reusable Donation Categories Modal (Hierarchical Main & Sub Categories) */}
       <Modal
         isOpen={catManageModalOpen}
-        onClose={() => setCatManageModalOpen(false)}
-        title="Manage Donation Categories"
-        maxWidth="lg"
+        onClose={() => {
+          setCatManageModalOpen(false);
+          handleCancelEditCategory();
+        }}
+        title="Manage Fund & Donation Categories"
+        maxWidth="2xl"
       >
-        <div className="space-y-6">
-          <div className="space-y-2">
-            <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-              Active Donation Categories:
-            </span>
-            <div className="divide-y divide-zinc-200 dark:divide-zinc-800 border rounded-lg overflow-hidden">
-              {fundCategories.map((c) => (
-                <div key={c.id} className="p-3 flex items-center justify-between text-xs bg-white dark:bg-zinc-900">
-                  <div>
-                    <div className="font-bold text-zinc-900 dark:text-zinc-100 flex items-center space-x-2">
-                      <span className="font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-[11px]">
-                        {c.category_code}
-                      </span>
-                      <span>{c.name_en}</span>
-                      <span className="text-[11px] text-zinc-500 font-sinhala">({c.name_si})</span>
-                    </div>
-                    {c.description && (
-                      <div className="text-[11px] text-zinc-500 mt-0.5">{c.description}</div>
-                    )}
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Badge variant={c.is_active ? 'success' : 'neutral'} size="sm">
-                      {c.is_active ? 'Active' : 'Inactive'}
-                    </Badge>
-                    <button
-                      type="button"
-                      onClick={() => handleToggleCatStatus(c)}
-                      className="text-[11px] text-blue-600 hover:underline"
-                    >
-                      {c.is_active ? 'Deactivate' : 'Activate'}
-                    </button>
-                  </div>
-                </div>
-              ))}
+        <div className="space-y-5 max-h-[80vh] overflow-y-auto pr-1">
+          {/* Header Stats & Search */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-zinc-50/70 dark:bg-zinc-900/40 p-3 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80">
+            <div className="flex items-center space-x-2 text-xs text-zinc-600 dark:text-zinc-400 font-medium">
+              <FolderTree className="w-4 h-4 text-blue-500" />
+              <span>
+                <strong>{mainCategories.length}</strong> Main Categories •{' '}
+                <strong>{fundCategories.filter((c) => Boolean(c.parent_id)).length}</strong> Subcategories
+              </span>
+            </div>
+
+            <div className="relative w-full sm:w-60">
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+              <input
+                type="text"
+                value={catManageSearch}
+                onChange={(e) => setCatManageSearch(e.target.value)}
+                placeholder="Search category or code..."
+                className="w-full h-7 pl-8 pr-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
             </div>
           </div>
 
-          {/* Add Category Form */}
-          <form onSubmit={handleCreateCategory} className="space-y-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
-            <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">
-              + New Donation Category:
-            </span>
-            <div className="grid grid-cols-3 gap-3">
+          {/* Hierarchical Categories Tree List */}
+          <div className="space-y-3">
+            {categoryGroups
+              .filter((group) => {
+                if (!catManageSearch.trim()) return true;
+                const q = catManageSearch.toLowerCase().trim();
+                const matchesMain =
+                  (group.main.category_code && group.main.category_code.toLowerCase().includes(q)) ||
+                  (group.main.name_en && group.main.name_en.toLowerCase().includes(q)) ||
+                  (group.main.name_si && group.main.name_si.includes(q));
+                const matchesSub = group.subs.some(
+                  (s) =>
+                    (s.category_code && s.category_code.toLowerCase().includes(q)) ||
+                    (s.name_en && s.name_en.toLowerCase().includes(q)) ||
+                    (s.name_si && s.name_si.includes(q))
+                );
+                return matchesMain || matchesSub;
+              })
+              .map((group) => {
+                const main = group.main;
+                const isCollapsed = Boolean(collapsedGroupIds[main.id]);
+
+                return (
+                  <div
+                    key={main.id}
+                    className="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-xs"
+                  >
+                    {/* Main Category Header Row */}
+                    <div className="p-3 bg-zinc-50/60 dark:bg-zinc-900/60 flex items-center justify-between gap-2 border-b border-zinc-100 dark:border-zinc-800">
+                      <div className="flex items-center space-x-2.5 min-w-0">
+                        {group.subs.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCollapsedGroupIds((prev) => ({
+                                ...prev,
+                                [main.id]: !prev[main.id],
+                              }))
+                            }
+                            className="p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-500 cursor-pointer"
+                          >
+                            {isCollapsed ? (
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            ) : (
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        )}
+                        <span className="font-mono px-2 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 font-bold text-xs">
+                          {main.category_code}
+                        </span>
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-bold text-xs text-zinc-900 dark:text-zinc-100 truncate">
+                            {main.name_en}
+                          </span>
+                          <span className="text-[11px] text-zinc-500 font-sinhala">
+                            {main.name_si}
+                          </span>
+                        </div>
+                        <Badge variant="neutral" size="sm" className="hidden sm:inline-flex">
+                          {group.subs.length} Subcategories
+                        </Badge>
+                      </div>
+
+                      <div className="flex items-center space-x-2 shrink-0">
+                        {group.totalReceivedCents > 0 && (
+                          <span className="text-xs font-mono font-semibold text-emerald-600 dark:text-emerald-400 mr-2">
+                            Rs. {(group.totalReceivedCents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          </span>
+                        )}
+                        {main.id > 0 && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-[11px]"
+                            onClick={() => handleSelectLevel('sub', main.id)}
+                            title="Add subcategory under this category"
+                          >
+                            <Plus className="w-3 h-3 mr-1" />
+                            <span>Add Sub</span>
+                          </Button>
+                        )}
+                        {main.id > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditCategory(main)}
+                            className="p-1 text-zinc-500 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer"
+                            title="Edit Category"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {main.id > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleCatStatus(main)}
+                            className="text-[11px] font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 cursor-pointer"
+                          >
+                            {main.is_active ? 'Deactivate' : 'Activate'}
+                          </button>
+                        )}
+                        {main.id > 0 && (
+                          <button
+                            type="button"
+                            disabled={deletingCatId === main.id}
+                            onClick={() => handleDeleteCategory(main)}
+                            className="p-1 text-zinc-400 hover:text-rose-600 cursor-pointer"
+                            title="Delete Category"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Subcategories Indented List */}
+                    {!isCollapsed && group.subs.length > 0 && (
+                      <div className="divide-y divide-zinc-100 dark:divide-zinc-800/60 bg-white dark:bg-zinc-900">
+                        {group.subs.map((sub) => (
+                          <div
+                            key={sub.id}
+                            className="p-2.5 pl-8 flex items-center justify-between text-xs hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors"
+                          >
+                            <div className="flex items-center space-x-2.5 min-w-0">
+                              <CornerDownRight className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                              <span className="font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-[11px] font-bold">
+                                {sub.category_code}
+                              </span>
+                              <div className="flex flex-col min-w-0">
+                                <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+                                  {sub.name_en}
+                                </span>
+                                <span className="text-[11px] text-zinc-500 font-sinhala">
+                                  {sub.name_si}
+                                </span>
+                              </div>
+                              {sub.description && (
+                                <span className="text-[11px] text-zinc-400 truncate max-w-xs hidden md:inline">
+                                  • {sub.description}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center space-x-2 shrink-0">
+                              {sub.total_received_cents !== undefined && sub.total_received_cents > 0 && (
+                                <span className="text-xs font-mono font-semibold text-zinc-700 dark:text-zinc-300 mr-2">
+                                  Rs. {(sub.total_received_cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                </span>
+                              )}
+                              <Badge variant={sub.is_active ? 'success' : 'neutral'} size="sm">
+                                {sub.is_active ? 'Active' : 'Inactive'}
+                              </Badge>
+                              <button
+                                type="button"
+                                onClick={() => handleStartEditCategory(sub)}
+                                className="p-1 text-zinc-500 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer"
+                                title="Edit Subcategory"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleCatStatus(sub)}
+                                className="text-[11px] font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 cursor-pointer"
+                              >
+                                {sub.is_active ? 'Deactivate' : 'Activate'}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={deletingCatId === sub.id}
+                                onClick={() => handleDeleteCategory(sub)}
+                                className="p-1 text-zinc-400 hover:text-rose-600 cursor-pointer"
+                                title="Delete Subcategory"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+          </div>
+
+          {/* Add / Edit Category Form Card */}
+          <form
+            onSubmit={handleSaveCategory}
+            className="p-4 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/30 dark:bg-blue-950/20 space-y-3.5"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center space-x-1.5">
+                {editingCat ? (
+                  <>
+                    <Edit2 className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Editing Category: {editingCat.category_code} — {editingCat.name_en}</span>
+                  </>
+                ) : (
+                  <>
+                    <FolderPlus className="w-3.5 h-3.5 text-blue-600" />
+                    <span>
+                      + Create New{' '}
+                      {catLevel === 'sub'
+                        ? `Subcategory under "${mainCategories.find((m) => m.id === catParentId)?.name_en || 'Main Category'}"`
+                        : 'Main Category'}
+                    </span>
+                  </>
+                )}
+              </span>
+
+              {editingCat && (
+                <button
+                  type="button"
+                  onClick={handleCancelEditCategory}
+                  className="text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 underline cursor-pointer"
+                >
+                  Cancel Edit
+                </button>
+              )}
+            </div>
+
+            {/* Level Selector */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => handleSelectLevel('main')}
+                className={`py-1.5 px-3 rounded-lg text-xs font-semibold border transition-all flex items-center justify-center space-x-1.5 cursor-pointer ${
+                  catLevel === 'main'
+                    ? 'bg-zinc-900 text-white border-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 shadow-sm'
+                    : 'bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800'
+                }`}
+              >
+                <Folder className="w-3.5 h-3.5" />
+                <span>Main Category Level</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSelectLevel('sub', catParentId || mainCategories[0]?.id)}
+                className={`py-1.5 px-3 rounded-lg text-xs font-semibold border transition-all flex items-center justify-center space-x-1.5 cursor-pointer ${
+                  catLevel === 'sub'
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                    : 'bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800'
+                }`}
+              >
+                <FolderTree className="w-3.5 h-3.5" />
+                <span>Subcategory Level</span>
+              </button>
+            </div>
+
+            {/* Parent Category Selector (If Subcategory) */}
+            {catLevel === 'sub' && (
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                  Parent Main Category <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={catParentId || ''}
+                  onChange={(e) => {
+                    const newParentId = Number(e.target.value);
+                    setCatParentId(newParentId);
+                    if (!editingCat) {
+                      fetchSuggestedCatCode('sub', newParentId);
+                    }
+                  }}
+                  className="w-full h-9 px-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 font-medium"
+                  required
+                >
+                  {mainCategories.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.category_code} — {m.name_en} ({m.name_si})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Category Code *</label>
+                  <button
+                    type="button"
+                    onClick={() => fetchSuggestedCatCode(catLevel, catParentId)}
+                    className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                  >
+                    Auto
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={catCode}
+                  onChange={(e) => setCatCode(e.target.value)}
+                  placeholder={catLevel === 'sub' ? 'e.g. 1.1' : 'e.g. FCAT-001'}
+                  className="w-full h-9 px-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  required
+                />
+              </div>
+
               <Input
-                label="Code (Optional)"
-                value={catCode}
-                onChange={(e) => setCatCode(e.target.value)}
-                placeholder="e.g. FCAT-PRNT"
-              />
-              <Input
-                label="Name (English)"
+                label="Name (English) *"
                 value={catNameEn}
                 onChange={(e) => setCatNameEn(e.target.value)}
-                placeholder="e.g. Donations from Parents"
+                placeholder="e.g. Alumni Contributions"
                 required
               />
-              <Input
-                label="Name (Sinhala)"
-                value={catNameSi}
-                onChange={(e) => setCatNameSi(e.target.value)}
-                placeholder="e.g. දෙමව්පිය පරිත්‍යාග"
-              />
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Name (Sinhala) *</label>
+                <input
+                  type="text"
+                  value={catNameSi}
+                  onChange={(e) => setCatNameSi(e.target.value)}
+                  placeholder="e.g. හිටපු සිසුන්ගේ ආධාර"
+                  className="w-full h-9 px-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 font-sinhala focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  required
+                />
+              </div>
             </div>
+
             <Input
-              label="Description"
+              label="Description (Optional)"
               value={catDesc}
               onChange={(e) => setCatDesc(e.target.value)}
               placeholder="e.g. Voluntary donations, sponsorships, and funds from parents"
             />
-            <div className="flex justify-end space-x-2 pt-2">
-              <Button variant="outline" type="button" onClick={() => setCatManageModalOpen(false)}>
+
+            <div className="flex justify-end space-x-2 pt-1">
+              <Button
+                variant="outline"
+                type="button"
+                size="sm"
+                onClick={() => {
+                  setCatManageModalOpen(false);
+                  handleCancelEditCategory();
+                }}
+              >
                 Close
               </Button>
-              <Button type="submit" isLoading={savingCat}>
-                Save Category
+              <Button type="submit" size="sm" isLoading={savingCat}>
+                {editingCat ? 'Update Category' : 'Save Category'}
               </Button>
             </div>
           </form>

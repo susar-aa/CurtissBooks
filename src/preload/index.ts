@@ -148,12 +148,16 @@ const api: ElectronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.FINANCIAL_CREATE_FUND, data),
     quickCreateFundingCategory: (name: string, name_si?: string): Promise<IpcResult<any>> =>
       ipcRenderer.invoke(IPC_CHANNELS.FINANCIAL_QUICK_CREATE_FUND_CATEGORY, name, name_si),
-    getFundCategories: (): Promise<IpcResult<any[]>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.FINANCIAL_GET_FUND_CATEGORIES),
-    createFundCategory: (data): Promise<IpcResult<any>> =>
+    getFundCategories: (activeOnly?: boolean): Promise<IpcResult<any[]>> =>
+      ipcRenderer.invoke(IPC_CHANNELS.FINANCIAL_GET_FUND_CATEGORIES, activeOnly),
+    suggestFundCategoryCode: (parentId?: number | null): Promise<IpcResult<string>> =>
+      ipcRenderer.invoke(IPC_CHANNELS.FINANCIAL_SUGGEST_FUND_CATEGORY_CODE, parentId),
+    createFundCategory: (data: { category_code?: string; name_en: string; name_si?: string; parent_id?: number | null; description?: string }): Promise<IpcResult<any>> =>
       ipcRenderer.invoke(IPC_CHANNELS.FINANCIAL_CREATE_FUND_CATEGORY, data),
     updateFundCategory: (id: number, data: any): Promise<IpcResult<boolean>> =>
       ipcRenderer.invoke(IPC_CHANNELS.FINANCIAL_UPDATE_FUND_CATEGORY, id, data),
+    deleteFundCategory: (id: number): Promise<IpcResult<boolean>> =>
+      ipcRenderer.invoke(IPC_CHANNELS.FINANCIAL_DELETE_FUND_CATEGORY, id),
     getFundTraces: (fundId?: number, expenseId?: number): Promise<IpcResult<any[]>> =>
       ipcRenderer.invoke(IPC_CHANNELS.FINANCIAL_GET_FUND_TRACES, fundId, expenseId),
     getFundReceipts: (limit?: number, offset?: number, yearId?: number, categoryId?: number, searchQuery?: string): Promise<IpcResult<any>> =>

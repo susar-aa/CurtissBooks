@@ -20,6 +20,7 @@ import { migration018 } from './migrations/018_reconciliation_tick_support';
 import { migration019 } from './migrations/019_petty_cash_report_indexes';
 import { migration020 } from './migrations/020_periodic_financial_statement';
 import { migration021 } from './migrations/021_cheque_bounce_fee';
+import { migration022 } from './migrations/022_fund_category_hierarchy';
 
 const MIGRATIONS = [
   migration001,
@@ -43,6 +44,7 @@ const MIGRATIONS = [
   migration019,
   migration020,
   migration021,
+  migration022,
 ];
 
 export function runMigrations(db: Database.Database): void {

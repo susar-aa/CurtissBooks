@@ -193,10 +193,20 @@ export function registerFinancialHandlers(): void {
     }
   });
 
-  ipcMain.handle(IPC_CHANNELS.FINANCIAL_GET_FUND_CATEGORIES, async (): Promise<IpcResult<any>> => {
+  ipcMain.handle(IPC_CHANNELS.FINANCIAL_GET_FUND_CATEGORIES, async (_event, activeOnly): Promise<IpcResult<any>> => {
     try {
-      const data = FinancialService.getFundCategories();
+      const data = FinancialService.getFundCategories(Boolean(activeOnly));
       return { success: true, data };
+    } catch (err: any) {
+      return { success: false, error: err.message || String(err) };
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.FINANCIAL_SUGGEST_FUND_CATEGORY_CODE, async (_event, parentId): Promise<IpcResult<string>> => {
+    try {
+      assertAuthorized('funds.view');
+      const code = FinancialService.suggestFundCategoryCode(parentId);
+      return { success: true, data: code };
     } catch (err: any) {
       return { success: false, error: err.message || String(err) };
     }
@@ -216,6 +226,16 @@ export function registerFinancialHandlers(): void {
     try {
       const session = assertAuthorized('funds.edit');
       FinancialService.updateFundCategory(id, data, session.user.id);
+      return { success: true, data: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || String(err) };
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.FINANCIAL_DELETE_FUND_CATEGORY, async (_event, id): Promise<IpcResult<any>> => {
+    try {
+      const session = assertAuthorized('funds.edit');
+      FinancialService.deleteFundCategory(id, session.user.id);
       return { success: true, data: true };
     } catch (err: any) {
       return { success: false, error: err.message || String(err) };

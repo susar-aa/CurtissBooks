@@ -125,8 +125,14 @@ export interface FundCategory {
   category_code: string;
   name_en: string;
   name_si: string;
+  parent_id?: number | null;
+  parent_code?: string | null;
+  parent_name_en?: string | null;
+  parent_name_si?: string | null;
   description?: string | null;
   is_active: boolean;
+  subcategories?: FundCategory[];
+  receipt_count?: number;
   fund_count?: number;
   total_received_cents?: number;
   total_spent_cents?: number;
@@ -190,6 +196,10 @@ export interface FundReceipt {
   fund_category_name_en?: string | null;
   fund_category_name_si?: string | null;
   fund_category_code?: string | null;
+  fund_category_parent_id?: number | null;
+  parent_category_code?: string | null;
+  parent_category_name_en?: string | null;
+  parent_category_name_si?: string | null;
   receipt_date: string;
   donor_or_dept: string;
   amount_cents: number;

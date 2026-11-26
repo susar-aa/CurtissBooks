@@ -1158,17 +1158,27 @@ export class FinancialService {
   // ========================================================
   // 4. FUNDS, FUND CATEGORIES & RECEIPTS
   // ========================================================
-  public static getFundCategories(): FundCategory[] {
+  public static getFundCategories(activeOnly: boolean = false): FundCategory[] {
     const db = getDatabase();
-    const rows = db.prepare(`
-      SELECT fc.id, fc.category_code, fc.name_en, fc.name_si, fc.description, fc.is_active, fc.created_at, fc.updated_at,
+    let sql = `
+      SELECT fc.id, fc.category_code, fc.name_en, fc.name_si, fc.parent_id, fc.description, fc.is_active, fc.created_at, fc.updated_at,
+             p.category_code as parent_code, p.name_en as parent_name_en, p.name_si as parent_name_si,
              COUNT(DISTINCT fr.id) as receipt_count,
              COALESCE(SUM(fr.amount_cents), 0) as total_received_cents
       FROM fund_categories fc
+      LEFT JOIN fund_categories p ON fc.parent_id = p.id
       LEFT JOIN fund_receipts fr ON fc.id = fr.fund_category_id AND fr.status = 'posted'
+    `;
+    const params: any[] = [];
+    if (activeOnly) {
+      sql += ' WHERE fc.is_active = 1';
+    }
+    sql += `
       GROUP BY fc.id
-      ORDER BY fc.id ASC
-    `).all() as any[];
+      ORDER BY COALESCE(p.category_code, fc.category_code) ASC, fc.category_code ASC
+    `;
+
+    const rows = db.prepare(sql).all(...params) as any[];
 
     return rows.map((r) => {
       const rcptCents = Number(r.total_received_cents || 0);
@@ -1177,6 +1187,10 @@ export class FinancialService {
         category_code: r.category_code,
         name_en: r.name_en,
         name_si: r.name_si,
+        parent_id: r.parent_id ? Number(r.parent_id) : null,
+        parent_code: r.parent_code || null,
+        parent_name_en: r.parent_name_en || null,
+        parent_name_si: r.parent_name_si || null,
         description: r.description,
         is_active: Boolean(r.is_active),
         receipt_count: Number(r.receipt_count || 0),
@@ -1190,10 +1204,41 @@ export class FinancialService {
     });
   }
 
+  public static suggestFundCategoryCode(parentId?: number | null): string {
+    const db = getDatabase();
+    if (parentId !== null && parentId !== undefined && parentId > 0) {
+      // Subcategory numbering under parent: e.g., FCAT-001.1 or 1.1
+      const parentRow = db.prepare('SELECT id, category_code FROM fund_categories WHERE id = ?').get(parentId) as any;
+      const parentCode = parentRow?.category_code || `FCAT-${String(parentId).padStart(3, '0')}`;
+      const numMatch = parentCode.match(/\d+/);
+      const parentNum = numMatch ? parseInt(numMatch[0], 10) : parentId;
+
+      const childCountRow = db.prepare('SELECT COUNT(*) as count FROM fund_categories WHERE parent_id = ?').get(parentId) as any;
+      let seq = (childCountRow?.count || 0) + 1;
+      let nextCode = `${parentNum}.${seq}`;
+      while (db.prepare('SELECT id FROM fund_categories WHERE LOWER(category_code) = LOWER(?)').get(nextCode)) {
+        seq++;
+        nextCode = `${parentNum}.${seq}`;
+      }
+      return nextCode;
+    } else {
+      // Main category: e.g. FCAT-001 or FC-01
+      const mainCountRow = db.prepare('SELECT COUNT(*) as count FROM fund_categories WHERE parent_id IS NULL').get() as any;
+      let seq = (mainCountRow?.count || 0) + 1;
+      let nextCode = `FCAT-${String(seq).padStart(3, '0')}`;
+      while (db.prepare('SELECT id FROM fund_categories WHERE LOWER(category_code) = LOWER(?)').get(nextCode)) {
+        seq++;
+        nextCode = `FCAT-${String(seq).padStart(3, '0')}`;
+      }
+      return nextCode;
+    }
+  }
+
   public static createFundCategory(data: {
     category_code?: string;
     name_en: string;
-    name_si: string;
+    name_si?: string;
+    parent_id?: number | null;
     description?: string;
   }, userId?: number): FundCategory {
     const db = getDatabase();
@@ -1201,32 +1246,60 @@ export class FinancialService {
     const cleanSi = (data.name_si || '').trim() || cleanEn;
     if (!cleanEn) throw new Error('Fund category English name is required.');
 
-    // Case-insensitive duplicate check
-    const existing = db.prepare(`
-      SELECT id FROM fund_categories
-      WHERE LOWER(name_en) = LOWER(?)
-      LIMIT 1
-    `).get(cleanEn) as any;
+    const targetParentId = data.parent_id ? Number(data.parent_id) : null;
+
+    // Check parent validity if specified (limit to 2 levels)
+    let parentCode: string | null = null;
+    let parentNameEn: string | null = null;
+    let parentNameSi: string | null = null;
+    if (targetParentId) {
+      const parentRow = db.prepare('SELECT id, category_code, name_en, name_si, parent_id FROM fund_categories WHERE id = ?').get(targetParentId) as any;
+      if (!parentRow) {
+        throw new Error('Parent fund category not found.');
+      }
+      if (parentRow.parent_id) {
+        throw new Error('Cannot add a subcategory under an existing subcategory (2-level hierarchy maximum).');
+      }
+      parentCode = parentRow.category_code;
+      parentNameEn = parentRow.name_en;
+      parentNameSi = parentRow.name_si;
+    }
+
+    // Case-insensitive duplicate name check under the same parent scope
+    let existing;
+    if (targetParentId) {
+      existing = db.prepare(`
+        SELECT id FROM fund_categories
+        WHERE LOWER(name_en) = LOWER(?) AND parent_id = ?
+        LIMIT 1
+      `).get(cleanEn, targetParentId) as any;
+    } else {
+      existing = db.prepare(`
+        SELECT id FROM fund_categories
+        WHERE LOWER(name_en) = LOWER(?) AND parent_id IS NULL
+        LIMIT 1
+      `).get(cleanEn) as any;
+    }
+
     if (existing) {
-      throw new Error(`A fund category with name "${cleanEn}" already exists.`);
+      throw new Error(`A fund category with name "${cleanEn}" already exists in this level.`);
     }
 
     let code = (data.category_code || '').trim();
     if (!code) {
-      const countRow = db.prepare('SELECT COUNT(*) as count FROM fund_categories').get() as any;
-      let seq = (countRow?.count || 0) + 1;
-      code = `FCAT-${String(seq).padStart(3, '0')}`;
-      while (db.prepare('SELECT id FROM fund_categories WHERE category_code = ?').get(code)) {
-        seq++;
-        code = `FCAT-${String(seq).padStart(3, '0')}`;
+      code = this.suggestFundCategoryCode(targetParentId);
+    } else {
+      const codeExists = db.prepare('SELECT id, name_en FROM fund_categories WHERE LOWER(category_code) = LOWER(?)').get(code) as any;
+      if (codeExists) {
+        throw new Error(`Category code "${code}" is already in use by "${codeExists.name_en}".`);
       }
     }
 
     const stmt = db.prepare(`
-      INSERT INTO fund_categories (category_code, name_en, name_si, description, is_active, updated_at)
-      VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
+      INSERT INTO fund_categories (category_code, name_en, name_si, parent_id, description, is_active, updated_at)
+      VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
     `);
-    const res = stmt.run(code, cleanEn, cleanSi, data.description?.trim() || null);
+    const res = stmt.run(code, cleanEn, cleanSi, targetParentId, data.description?.trim() || null);
     const catId = Number(res.lastInsertRowid);
 
     AuditService.logAuthEvent(userId || null, 'system', 'FUND_CATEGORY_CREATED', `fund_categories:${catId}`, 'success', `Created fund category ${code} - ${cleanEn}`);
@@ -1236,6 +1309,10 @@ export class FinancialService {
       category_code: code,
       name_en: cleanEn,
       name_si: cleanSi,
+      parent_id: targetParentId,
+      parent_code: parentCode,
+      parent_name_en: parentNameEn,
+      parent_name_si: parentNameSi,
       description: data.description?.trim() || null,
       is_active: true,
       fund_count: 0,
@@ -1246,17 +1323,30 @@ export class FinancialService {
   }
 
   public static updateFundCategory(id: number, data: {
+    category_code?: string;
     name_en?: string;
     name_si?: string;
+    parent_id?: number | null;
     description?: string;
     is_active?: boolean;
   }, userId?: number): void {
     const db = getDatabase();
-    const existing = db.prepare('SELECT id FROM fund_categories WHERE id = ?').get(id) as any;
+    const existing = db.prepare('SELECT id, category_code, parent_id FROM fund_categories WHERE id = ?').get(id) as any;
     if (!existing) throw new Error('Fund category not found.');
 
     const updates: string[] = ['updated_at = CURRENT_TIMESTAMP'];
     const params: any[] = [];
+
+    if (data.category_code !== undefined) {
+      const cleanCode = data.category_code.trim();
+      if (!cleanCode) throw new Error('Category code cannot be empty.');
+      const dup = db.prepare('SELECT id, name_en FROM fund_categories WHERE LOWER(category_code) = LOWER(?) AND id != ?').get(cleanCode, id) as any;
+      if (dup) {
+        throw new Error(`Category code "${cleanCode}" is already in use by "${dup.name_en}".`);
+      }
+      updates.push('category_code = ?');
+      params.push(cleanCode);
+    }
 
     if (data.name_en !== undefined) {
       const clean = data.name_en.trim();
@@ -1272,6 +1362,21 @@ export class FinancialService {
       updates.push('description = ?');
       params.push(data.description.trim() || null);
     }
+    if (data.parent_id !== undefined) {
+      const pId = data.parent_id ? Number(data.parent_id) : null;
+      if (pId === id) {
+        throw new Error('A category cannot be its own parent.');
+      }
+      if (pId) {
+        const parentRow = db.prepare('SELECT id, parent_id FROM fund_categories WHERE id = ?').get(pId) as any;
+        if (!parentRow) throw new Error('Selected parent category does not exist.');
+        if (parentRow.parent_id) {
+          throw new Error('Cannot assign a subcategory as a parent (2-level hierarchy maximum).');
+        }
+      }
+      updates.push('parent_id = ?');
+      params.push(pId);
+    }
     if (data.is_active !== undefined) {
       updates.push('is_active = ?');
       params.push(data.is_active ? 1 : 0);
@@ -1281,6 +1386,34 @@ export class FinancialService {
     db.prepare(`UPDATE fund_categories SET ${updates.join(', ')} WHERE id = ?`).run(...params);
 
     AuditService.logAuthEvent(userId || null, 'system', 'FUND_CATEGORY_UPDATED', `fund_categories:${id}`, 'success');
+  }
+
+  public static deleteFundCategory(id: number, userId?: number): void {
+    const db = getDatabase();
+    const existing = db.prepare('SELECT id, category_code, name_en FROM fund_categories WHERE id = ?').get(id) as any;
+    if (!existing) throw new Error('Fund category not found.');
+
+    // 1. Check if category has subcategories
+    const childRow = db.prepare('SELECT COUNT(*) as count FROM fund_categories WHERE parent_id = ?').get(id) as any;
+    if (childRow && childRow.count > 0) {
+      throw new Error(`Cannot delete "${existing.name_en}" because it contains ${childRow.count} subcategory(s). Please reassign or delete subcategories first.`);
+    }
+
+    // 2. Check if category has fund receipts
+    const rcptRow = db.prepare('SELECT COUNT(*) as count FROM fund_receipts WHERE fund_category_id = ?').get(id) as any;
+    if (rcptRow && rcptRow.count > 0) {
+      throw new Error(`Cannot delete "${existing.name_en}" because it is linked to ${rcptRow.count} donation/fund receipt(s). Deactivate it instead.`);
+    }
+
+    // 3. Check if category is linked to funds
+    const fundsRow = db.prepare('SELECT COUNT(*) as count FROM funds WHERE fund_category_id = ?').get(id) as any;
+    if (fundsRow && fundsRow.count > 0) {
+      throw new Error(`Cannot delete "${existing.name_en}" because it is linked to ${fundsRow.count} fund record(s). Deactivate it instead.`);
+    }
+
+    db.prepare('DELETE FROM fund_categories WHERE id = ?').run(id);
+
+    AuditService.logAuthEvent(userId || null, 'system', 'FUND_CATEGORY_DELETED', `fund_categories:${id}`, 'success', `Deleted fund category ${existing.category_code} - ${existing.name_en}`);
   }
 
   public static getFundTraces(fundId?: number, expenseId?: number): FundUsageTrace[] {
@@ -1502,12 +1635,13 @@ export class FinancialService {
       SELECT COUNT(*) as count
       FROM fund_receipts fr
       LEFT JOIN funds f ON fr.fund_id = f.id
+      LEFT JOIN fund_categories fc ON COALESCE(fr.fund_category_id, f.fund_category_id) = fc.id
       WHERE fr.financial_year_id = ?
     `;
     const countParams: any[] = [yearId];
     if (categoryId) {
-      countSql += ' AND (fr.fund_category_id = ? OR f.fund_category_id = ?)';
-      countParams.push(categoryId, categoryId);
+      countSql += ' AND (fc.id = ? OR fc.parent_id = ? OR fr.fund_category_id = ? OR f.fund_category_id = ?)';
+      countParams.push(categoryId, categoryId, categoryId, categoryId);
     }
     if (cleanSearch) {
       countSql += ' AND (fr.receipt_no LIKE ? COLLATE NOCASE OR fr.donor_or_dept LIKE ? COLLATE NOCASE OR fr.reference_no LIKE ? COLLATE NOCASE OR fr.purpose LIKE ? COLLATE NOCASE)';
@@ -1527,17 +1661,22 @@ export class FinancialService {
              fc.category_code as fund_category_code,
              COALESCE(fc.name_en, 'General') as fund_category_name_en,
              COALESCE(fc.name_si, 'සාමාන්‍ය') as fund_category_name_si,
+             fc.parent_id as fund_category_parent_id,
+             p.category_code as parent_category_code,
+             p.name_en as parent_category_name_en,
+             p.name_si as parent_category_name_si,
              ba.bank_name
       FROM fund_receipts fr
       LEFT JOIN funds f ON fr.fund_id = f.id
       LEFT JOIN fund_categories fc ON COALESCE(fr.fund_category_id, f.fund_category_id) = fc.id
+      LEFT JOIN fund_categories p ON fc.parent_id = p.id
       LEFT JOIN bank_accounts ba ON fr.bank_account_id = ba.id
       WHERE fr.financial_year_id = ?
     `;
     const queryParams: any[] = [yearId];
     if (categoryId) {
-      querySql += ' AND (fr.fund_category_id = ? OR f.fund_category_id = ?)';
-      queryParams.push(categoryId, categoryId);
+      querySql += ' AND (fc.id = ? OR fc.parent_id = ? OR fr.fund_category_id = ? OR f.fund_category_id = ?)';
+      queryParams.push(categoryId, categoryId, categoryId, categoryId);
     }
     if (cleanSearch) {
       querySql += ' AND (fr.receipt_no LIKE ? COLLATE NOCASE OR fr.donor_or_dept LIKE ? COLLATE NOCASE OR fr.reference_no LIKE ? COLLATE NOCASE OR fr.purpose LIKE ? COLLATE NOCASE)';

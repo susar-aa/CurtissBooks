@@ -123,9 +123,11 @@ export interface ElectronAPI {
     getFunds: (searchQuery?: string, categoryId?: number) => Promise<IpcResult<any[]>>;
     createFund: (data: any) => Promise<IpcResult<any>>;
     quickCreateFundingCategory: (name: string, name_si?: string) => Promise<IpcResult<any>>;
-    getFundCategories: () => Promise<IpcResult<any[]>>;
-    createFundCategory: (data: { category_code?: string; name_en: string; name_si: string; description?: string }) => Promise<IpcResult<any>>;
-    updateFundCategory: (id: number, data: { name_en?: string; name_si?: string; description?: string; is_active?: boolean }) => Promise<IpcResult<boolean>>;
+    getFundCategories: (activeOnly?: boolean) => Promise<IpcResult<any[]>>;
+    suggestFundCategoryCode: (parentId?: number | null) => Promise<IpcResult<string>>;
+    createFundCategory: (data: { category_code?: string; name_en: string; name_si?: string; parent_id?: number | null; description?: string }) => Promise<IpcResult<any>>;
+    updateFundCategory: (id: number, data: { category_code?: string; name_en?: string; name_si?: string; parent_id?: number | null; description?: string; is_active?: boolean }) => Promise<IpcResult<boolean>>;
+    deleteFundCategory: (id: number) => Promise<IpcResult<boolean>>;
     getFundTraces: (fundId?: number, expenseId?: number) => Promise<IpcResult<any[]>>;
     getFundReceipts: (limit?: number, offset?: number, yearId?: number, categoryId?: number, searchQuery?: string) => Promise<IpcResult<any>>;
     getFundReceiptsSummary: (yearId?: number) => Promise<IpcResult<{ total_cents: number; bank_cents: number; cash_cents: number; petty_cash_cents: number; total_count: number }>>;
