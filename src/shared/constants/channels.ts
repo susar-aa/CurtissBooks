@@ -12,9 +12,11 @@ export const IPC_CHANNELS = {
   SETTINGS_GET_ALL: 'settings:getAll',
   SETTINGS_GET: 'settings:get',
   SETTINGS_SET: 'settings:set',
+  SETTINGS_FACTORY_RESET: 'settings:factoryReset',
 
   // Authentication & Session
   AUTH_CHECK_SETUP: 'auth:checkSetup',
+  AUTH_VERIFY_DEVELOPER_PIN: 'auth:verifyDeveloperPin',
   AUTH_SETUP_INITIAL_ADMIN: 'auth:setupInitialAdmin',
   AUTH_LOGIN: 'auth:login',
   AUTH_LOGIN_PIN: 'auth:loginPin',

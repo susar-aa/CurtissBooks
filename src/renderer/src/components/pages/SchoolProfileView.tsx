@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { School, Building, Mail, Phone, User, Calendar, Image as ImageIcon, Save, CheckCircle2, AlertCircle } from 'lucide-react';
+import { School, Building, Mail, Phone, User, Calendar, Image as ImageIcon, Save, CheckCircle2, AlertCircle, AlertTriangle, Trash2, ShieldAlert } from 'lucide-react';
 import { PageHeader } from '../ui/PageHeader';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
+import { Modal } from '../ui/Modal';
 import { useToast } from '../ui/Toast';
 import { SchoolProfile } from '../../../shared/types/school';
 
@@ -15,6 +16,13 @@ export const SchoolProfileView: React.FC = () => {
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Factory Reset States
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [adminPin, setAdminPin] = useState('');
+  const [confirmChecked, setConfirmChecked] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
   const [profile, setProfile] = useState<Partial<SchoolProfile>>({
     name_en: '',
     name_si: '',
@@ -97,6 +105,40 @@ export const SchoolProfileView: React.FC = () => {
       toastError(err instanceof Error ? err.message : 'Update failed');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleFactoryReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetError(null);
+
+    const cleanPin = adminPin.trim();
+    if (!cleanPin || cleanPin.length !== 5) {
+      setResetError('Administrator 5-digit PIN is required.');
+      return;
+    }
+
+    if (!confirmChecked) {
+      setResetError('Please confirm the acknowledgment checkbox before proceeding.');
+      return;
+    }
+
+    setIsResetting(true);
+    try {
+      const res = await window.curtissApi.settings.factoryReset(cleanPin);
+      if (res.success) {
+        success(t('dangerZone.successToast'));
+        setResetModalOpen(false);
+        setTimeout(() => {
+          window.location.reload();
+        }, 1200);
+      } else {
+        setResetError(res.error || 'Factory reset failed. Please check administrator credentials.');
+      }
+    } catch (err: unknown) {
+      setResetError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -339,7 +381,118 @@ export const SchoolProfileView: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Section 5: Danger Zone - Factory Reset */}
+        <div className="p-6 rounded-2xl bg-red-950/20 border border-red-900/50 shadow-sm space-y-4">
+          <div className="flex items-center justify-between border-b border-red-900/40 pb-3">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-red-500" />
+              <h2 className="text-base font-semibold text-red-400">
+                {t('dangerZone.title')}
+              </h2>
+            </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-red-950/80 border border-red-800 text-red-400 font-semibold uppercase">
+              Irreversible
+            </span>
+          </div>
+
+          <p className="text-xs text-zinc-400 leading-relaxed">
+            {t('dangerZone.subtitle')}
+          </p>
+
+          <div className="pt-1">
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => {
+                setAdminPin('');
+                setConfirmChecked(false);
+                setResetError(null);
+                setResetModalOpen(true);
+              }}
+              className="gap-2 bg-red-600 hover:bg-red-700 text-white"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>{t('dangerZone.button')}</span>
+            </Button>
+          </div>
+        </div>
       </form>
+
+      {/* Factory Reset Modal */}
+      <Modal
+        isOpen={resetModalOpen}
+        onClose={() => setResetModalOpen(false)}
+        title={t('dangerZone.modalTitle')}
+        maxWidth="md"
+      >
+        <form onSubmit={handleFactoryReset} className="space-y-4">
+          <div className="p-3 text-xs bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 flex items-start space-x-2.5">
+            <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+            <div className="leading-relaxed">
+              {t('dangerZone.modalWarning')}
+            </div>
+          </div>
+
+          {resetError && (
+            <div className="p-2.5 text-xs bg-red-950/60 border border-red-900 rounded-lg text-red-400 flex items-center space-x-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{resetError}</span>
+            </div>
+          )}
+
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-zinc-300">
+              {t('dangerZone.adminPinLabel')}
+            </label>
+            <Input
+              id="factory-reset-admin-pin"
+              type="password"
+              maxLength={5}
+              placeholder={t('dangerZone.adminPinPlaceholder')}
+              value={adminPin}
+              onChange={(e) => setAdminPin(e.target.value.replace(/\D/g, '').slice(0, 5))}
+              disabled={isResetting}
+              autoFocus
+              required
+            />
+          </div>
+
+          <label className="flex items-start space-x-2.5 text-xs text-zinc-300 select-none cursor-pointer pt-1">
+            <input
+              type="checkbox"
+              checked={confirmChecked}
+              onChange={(e) => setConfirmChecked(e.target.checked)}
+              disabled={isResetting}
+              className="mt-0.5 rounded border-zinc-700 bg-zinc-900 text-red-600 focus:ring-red-500"
+            />
+            <span>{t('dangerZone.confirmationCheckbox')}</span>
+          </label>
+
+          <div className="flex justify-end space-x-2 pt-3 border-t border-zinc-800">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isResetting}
+              onClick={() => setResetModalOpen(false)}
+            >
+              {t('dangerZone.cancelButton')}
+            </Button>
+            <Button
+              type="submit"
+              variant="destructive"
+              size="sm"
+              isLoading={isResetting}
+              disabled={!confirmChecked || adminPin.length !== 5}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+              <span>{t('dangerZone.confirmButton')}</span>
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

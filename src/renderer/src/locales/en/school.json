@@ -15,6 +15,19 @@
   "mission": "Mission Statement",
   "logo": "Official School Crest / Logo",
   "uploadLogo": "Upload School Crest (PNG / WEBP, Max 2MB)",
-  "saveSuccess": "School profile updated successfully."
+  "saveSuccess": "School profile updated successfully.",
+  "dangerZone": {
+    "title": "Danger Zone: Factory Reset Application",
+    "subtitle": "Permanently erase all institutional accounts, financial years, ledger vouchers, cheques, and user records. System will reset to fresh installation state.",
+    "button": "Reset Application Data",
+    "modalTitle": "Confirm Factory Reset & Data Wipe",
+    "modalWarning": "WARNING: This action is permanent and completely irreversible. All transactional records, receipts, bank accounts, vouchers, and staff accounts will be permanently destroyed.",
+    "adminPinLabel": "Administrator 5-Digit PIN",
+    "adminPinPlaceholder": "Enter Admin PIN (e.g. 12345)",
+    "confirmationCheckbox": "I confirm that I want to completely erase all data and reset the application.",
+    "confirmButton": "Wipe All Data & Reset Application",
+    "cancelButton": "Cancel",
+    "successToast": "Application data completely wiped. Reloading..."
+  }
 }
 

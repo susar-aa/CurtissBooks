@@ -32,10 +32,13 @@ const api: ElectronAPI = {
     getAll: (): Promise<IpcResult<Record<string, string>>> => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET_ALL),
     get: (key: string): Promise<IpcResult<string | null>> => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET, key),
     set: (key: string, value: string): Promise<IpcResult<boolean>> => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET, key, value),
+    factoryReset: (adminPin: string): Promise<IpcResult<boolean>> => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_FACTORY_RESET, adminPin),
   },
   auth: {
     checkSetup: (): Promise<IpcResult<{ setupRequired: boolean }>> =>
       ipcRenderer.invoke(IPC_CHANNELS.AUTH_CHECK_SETUP),
+    verifyDeveloperPin: (developerPin: string): Promise<IpcResult<boolean>> =>
+      ipcRenderer.invoke(IPC_CHANNELS.AUTH_VERIFY_DEVELOPER_PIN, developerPin),
     setupInitialAdmin: (data): Promise<IpcResult<AuthSession>> =>
       ipcRenderer.invoke(IPC_CHANNELS.AUTH_SETUP_INITIAL_ADMIN, data),
     login: (credentials): Promise<IpcResult<AuthSession>> =>

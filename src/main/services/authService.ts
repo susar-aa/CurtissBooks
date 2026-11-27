@@ -6,8 +6,16 @@ import { User, AuthSession } from '../../shared/types/auth';
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_WINDOW_MINUTES = 15;
 const SESSION_EXPIRY_HOURS = 24;
+export const DEVELOPER_LICENSE_PIN = '200611003614';
 
 export class AuthService {
+  /**
+   * Verifies the master developer license PIN required during initial installation.
+   */
+  public static verifyDeveloperPin(developerPin: string): boolean {
+    return (developerPin || '').trim() === DEVELOPER_LICENSE_PIN;
+  }
+
   /**
    * Checks if initial administrator provisioning is required.
    */
@@ -19,18 +27,25 @@ export class AuthService {
 
   /**
    * Creates the first administrator account (can only be called once).
+   * Strictly requires valid Developer License PIN verification.
    */
   public static setupInitialAdmin(data: {
     fullName: string;
     username: string;
     password?: string;
     pin?: string;
+    developerPin?: string;
   }): AuthSession {
     const db = getDatabase();
 
     // Enforce that setup can only be run once
     if (!this.checkSetupRequired()) {
       throw new Error('Initial setup has already been completed.');
+    }
+
+    // Enforce Developer License PIN verification to prevent unauthorized installations
+    if (!data.developerPin || data.developerPin.trim() !== DEVELOPER_LICENSE_PIN) {
+      throw new Error('Invalid Developer License PIN. System installation unauthorized.');
     }
 
     const trimmedName = data.fullName.trim();

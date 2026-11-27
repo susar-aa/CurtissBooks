@@ -25,6 +25,19 @@ export function registerAuthHandlers(): void {
     }
   });
 
+  ipcMain.handle(IPC_CHANNELS.AUTH_VERIFY_DEVELOPER_PIN, async (_event, developerPin: string): Promise<IpcResult<boolean>> => {
+    try {
+      const isValid = AuthService.verifyDeveloperPin(developerPin);
+      if (!isValid) {
+        return { success: false, error: 'Invalid Developer License PIN. System installation unauthorized.' };
+      }
+      return { success: true, data: true };
+    } catch (err: unknown) {
+      const error = err instanceof Error ? err.message : String(err);
+      return { success: false, error };
+    }
+  });
+
   ipcMain.handle(IPC_CHANNELS.AUTH_SETUP_INITIAL_ADMIN, async (_event, data): Promise<IpcResult<AuthSession>> => {
     try {
       const session = AuthService.setupInitialAdmin(data);

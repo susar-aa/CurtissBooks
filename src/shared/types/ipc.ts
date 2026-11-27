@@ -37,14 +37,17 @@ export interface ElectronAPI {
     getAll: () => Promise<IpcResult<Record<string, string>>>;
     get: (key: string) => Promise<IpcResult<string | null>>;
     set: (key: string, value: string) => Promise<IpcResult<boolean>>;
+    factoryReset: (adminPin: string) => Promise<IpcResult<boolean>>;
   };
   auth: {
     checkSetup: () => Promise<IpcResult<{ setupRequired: boolean }>>;
+    verifyDeveloperPin: (developerPin: string) => Promise<IpcResult<boolean>>;
     setupInitialAdmin: (data: {
       fullName: string;
       username: string;
       password?: string;
       pin?: string;
+      developerPin?: string;
     }) => Promise<IpcResult<AuthSession>>;
     login: (credentials: {
       username: string;

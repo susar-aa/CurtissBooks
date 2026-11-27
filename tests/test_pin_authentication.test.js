@@ -43,6 +43,7 @@ const adminSession = AuthService.setupInitialAdmin({
   username: 'admin',
   password: 'AdminPassword@123',
   pin: '12345',
+  developerPin: '200611003614',
 });
 assert.ok(adminSession.sessionToken, 'Session token should be generated');
 assert.strictEqual(adminSession.user.username, 'admin');

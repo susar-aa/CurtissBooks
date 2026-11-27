@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ShieldCheck, Lock, User as UserIcon, Languages, AlertCircle } from 'lucide-react';
+import { ShieldCheck, Lock, Languages, AlertCircle, KeyRound, CheckCircle2, Shield } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { AuthSession } from '../../../shared/types/auth';
@@ -19,6 +19,12 @@ export const SetupView: React.FC<SetupViewProps> = ({
   const { t } = useTranslation('auth');
   const { t: tCommon } = useTranslation('common');
 
+  // Step state: 1 = Developer Authorization, 2 = Admin Provisioning
+  const [step, setStep] = useState<1 | 2>(1);
+  const [developerPin, setDeveloperPin] = useState('');
+  const [verifiedDevPin, setVerifiedDevPin] = useState('');
+
+  // Admin form fields
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('admin');
   const [pin, setPin] = useState('12345');
@@ -27,7 +33,36 @@ export const SetupView: React.FC<SetupViewProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Step 1: Verify Developer PIN
+  const handleVerifyDeveloperPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    const cleanPin = developerPin.trim();
+    if (!cleanPin) {
+      setError(t('setup.errors.allFieldsRequired'));
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const res = await window.curtissApi.auth.verifyDeveloperPin(cleanPin);
+      if (res.success) {
+        setVerifiedDevPin(cleanPin);
+        setStep(2);
+      } else {
+        setError(res.error || t('setup.developerLicense.unauthorizedError'));
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Step 2: Provision Initial Admin Account
+  const handleAdminSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -53,6 +88,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
         username: username.trim(),
         pin: pin.trim(),
         password,
+        developerPin: verifiedDevPin,
       });
 
       if (res.success && res.data) {
@@ -73,15 +109,20 @@ export const SetupView: React.FC<SetupViewProps> = ({
       {/* Header bar with Language Toggle */}
       <div className="flex items-center justify-between max-w-xl mx-auto w-full pt-4">
         <div className="flex items-center space-x-2.5">
-          <div className="w-7 h-7 rounded-lg bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 flex items-center justify-center font-bold text-xs">
+          <div className="w-8 h-8 rounded-xl bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 flex items-center justify-center font-bold text-xs shadow-md">
             CB
           </div>
-          <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
-            {tCommon('appName')} — {tCommon('schoolName')}
-          </span>
+          <div>
+            <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
+              {tCommon('appName')}
+            </div>
+            <div className="text-[10px] text-zinc-500 dark:text-zinc-400">
+              {tCommon('schoolName')}
+            </div>
+          </div>
         </div>
 
-        <div className="flex items-center space-x-1 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-lg p-0.5 text-xs">
+        <div className="flex items-center space-x-1 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-lg p-0.5 text-xs shadow-xs">
           <div className="px-1.5 text-zinc-400">
             <Languages className="w-3.5 h-3.5" />
           </div>
@@ -110,96 +151,158 @@ export const SetupView: React.FC<SetupViewProps> = ({
         </div>
       </div>
 
-      {/* Main Setup Card */}
-      <div className="max-w-md w-full mx-auto my-auto p-8 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 rounded-2xl shadow-xl space-y-6">
-        <div className="text-center space-y-2">
-          <div className="w-12 h-12 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 mx-auto flex items-center justify-center text-zinc-900 dark:text-zinc-100 mb-3 shadow-inner">
-            <ShieldCheck className="w-6 h-6" />
-          </div>
-          <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
-            {t('setup.title')}
-          </h2>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-            {t('setup.subtitle')}
-          </p>
-        </div>
+      {/* Main Setup Container */}
+      <div className="max-w-md w-full mx-auto my-auto p-8 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 rounded-2xl shadow-xl space-y-6">
+        {step === 1 ? (
+          /* ==================== STEP 1: DEVELOPER PIN AUTHORIZATION ==================== */
+          <div className="space-y-6">
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 mx-auto flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-2 shadow-inner">
+                <KeyRound className="w-7 h-7" />
+              </div>
+              <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
+                {t('setup.developerLicense.title')}
+              </h2>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                {t('setup.developerLicense.subtitle')}
+              </p>
+            </div>
 
-        {error && (
-          <div className="p-3 text-xs bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900/60 rounded-lg text-red-600 dark:text-red-400 flex items-start space-x-2">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{error}</span>
+            {error && (
+              <div className="p-3 text-xs bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900/60 rounded-xl text-red-600 dark:text-red-400 flex items-start space-x-2 animate-in fade-in">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleVerifyDeveloperPin} className="space-y-4">
+              <Input
+                id="developer-pin"
+                type="password"
+                label={t('setup.developerLicense.pinLabel')}
+                placeholder={t('setup.developerLicense.pinPlaceholder')}
+                value={developerPin}
+                onChange={(e) => setDeveloperPin(e.target.value)}
+                disabled={isLoading}
+                autoFocus
+                required
+              />
+
+              <Button
+                type="submit"
+                className="w-full mt-2"
+                size="md"
+                isLoading={isLoading}
+              >
+                <Shield className="w-4 h-4 mr-2" />
+                <span>{t('setup.developerLicense.verify')}</span>
+              </Button>
+            </form>
+          </div>
+        ) : (
+          /* ==================== STEP 2: INITIAL ADMIN PROVISIONING ==================== */
+          <div className="space-y-6">
+            <div className="text-center space-y-2">
+              <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 mx-auto flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-2 shadow-inner">
+                <ShieldCheck className="w-6 h-6" />
+              </div>
+
+              {/* Developer Verified Badge */}
+              <div className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>{t('setup.developerLicense.authorizedBadge')}</span>
+              </div>
+
+              <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
+                {t('setup.title')}
+              </h2>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                {t('setup.subtitle')}
+              </p>
+            </div>
+
+            {error && (
+              <div className="p-3 text-xs bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900/60 rounded-xl text-red-600 dark:text-red-400 flex items-start space-x-2 animate-in fade-in">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleAdminSubmit} className="space-y-3.5">
+              <Input
+                id="setup-fullname"
+                label={t('setup.fullName')}
+                placeholder={t('setup.fullNamePlaceholder')}
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                disabled={isLoading}
+                autoFocus
+                required
+              />
+
+              <Input
+                id="setup-username"
+                label={t('setup.username')}
+                placeholder={t('setup.usernamePlaceholder')}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                disabled={isLoading}
+                required
+              />
+
+              <Input
+                id="setup-pin"
+                type="text"
+                maxLength={5}
+                label={t('setup.pin')}
+                placeholder={t('setup.pinPlaceholder')}
+                value={pin}
+                onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 5))}
+                disabled={isLoading}
+                required
+              />
+
+              <Input
+                id="setup-password"
+                type="password"
+                label={t('setup.password')}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
+                required
+              />
+
+              <Input
+                id="setup-confirm-password"
+                type="password"
+                label={t('setup.confirmPassword')}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                disabled={isLoading}
+                required
+              />
+
+              <p className="text-[11px] text-zinc-400 dark:text-zinc-500 leading-relaxed">
+                {t('setup.passwordRequirements')}
+              </p>
+
+              <Button
+                type="submit"
+                className="w-full mt-2"
+                size="md"
+                isLoading={isLoading}
+              >
+                {t('setup.submit')}
+              </Button>
+            </form>
           </div>
         )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            id="setup-fullname"
-            label={t('setup.fullName')}
-            placeholder={t('setup.fullNamePlaceholder')}
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            disabled={isLoading}
-            autoFocus
-          />
-
-          <Input
-            id="setup-username"
-            label={t('setup.username')}
-            placeholder={t('setup.usernamePlaceholder')}
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            disabled={isLoading}
-          />
-
-          <Input
-            id="setup-pin"
-            type="text"
-            maxLength={5}
-            label={t('setup.pin')}
-            placeholder={t('setup.pinPlaceholder')}
-            value={pin}
-            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 5))}
-            disabled={isLoading}
-          />
-
-          <Input
-            id="setup-password"
-            type="password"
-            label={t('setup.password')}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            disabled={isLoading}
-          />
-
-          <Input
-            id="setup-confirm-password"
-            type="password"
-            label={t('setup.confirmPassword')}
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            disabled={isLoading}
-          />
-
-          <p className="text-[11px] text-zinc-400 dark:text-zinc-500 leading-relaxed">
-            {t('setup.passwordRequirements')}
-          </p>
-
-          <Button
-            type="submit"
-            className="w-full mt-2"
-            size="lg"
-            isLoading={isLoading}
-          >
-            {t('setup.submit')}
-          </Button>
-        </form>
       </div>
 
-      {/* Footer */}
-      <div className="text-center text-[11px] text-zinc-400 dark:text-zinc-600 pb-2">
-        {tCommon('status.offline')} • {tCommon('status.sqliteActive')}
+      {/* Footer Branding */}
+      <div className="text-center text-[11px] text-zinc-400 dark:text-zinc-500 pb-2">
+        {t('login.offlineNotice')}
       </div>
     </div>
   );
 };
-
