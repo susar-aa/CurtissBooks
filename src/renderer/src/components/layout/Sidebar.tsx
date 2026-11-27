@@ -121,9 +121,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {isCollapsed ? (
               <img src={appLogo} alt="Curtiss" className="w-8 h-8 object-contain shrink-0" />
             ) : (
-              <div className="flex items-center space-x-2 overflow-hidden">
+              <div className="flex items-center space-x-2.5 overflow-hidden">
                 <img src={appLogo} alt="Curtiss" className="w-7 h-7 object-contain shrink-0" />
-                <img src={textLogo} alt="CurtissBooks" className="h-6 w-auto object-contain max-w-[155px]" />
+                <img src={textLogo} alt="CurtissBooks" className="h-[22px] w-auto object-contain dark:invert shrink-0" />
               </div>
             )}
           </div>

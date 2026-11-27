@@ -110,9 +110,9 @@ export const SetupView: React.FC<SetupViewProps> = ({
     <div className="min-h-screen w-screen flex flex-col justify-between bg-zinc-50 dark:bg-zinc-950 p-6 select-none font-sans">
       {/* Header bar with Language Toggle */}
       <div className="flex items-center justify-between max-w-xl mx-auto w-full pt-4">
-        <div className="flex items-center space-x-2.5">
+        <div className="flex items-center space-x-3">
           <img src={appLogo} alt="Curtiss" className="w-8 h-8 object-contain shrink-0" />
-          <img src={textLogo} alt="CurtissBooks" className="h-6 w-auto object-contain" />
+          <img src={textLogo} alt="CurtissBooks" className="h-7 w-auto object-contain dark:invert" />
         </div>
 
         <div className="flex items-center space-x-1 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-lg p-0.5 text-xs shadow-xs">

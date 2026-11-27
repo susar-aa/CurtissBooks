@@ -149,9 +149,9 @@ export const LoginView: React.FC<LoginViewProps> = ({
     <div className="min-h-screen w-screen flex flex-col justify-between bg-zinc-50 dark:bg-zinc-950 p-6 select-none font-sans">
       {/* Top Header */}
       <div className="flex items-center justify-between max-w-xl mx-auto w-full pt-2">
-        <div className="flex items-center space-x-2.5">
+        <div className="flex items-center space-x-3">
           <img src={appLogo} alt="Curtiss" className="w-8 h-8 object-contain shrink-0" />
-          <img src={textLogo} alt="CurtissBooks" className="h-6 w-auto object-contain" />
+          <img src={textLogo} alt="CurtissBooks" className="h-7 w-auto object-contain dark:invert" />
         </div>
 
         {/* Language selector toggle */}
