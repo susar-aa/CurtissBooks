@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Tooltip } from '../ui/Tooltip';
+import appLogo from '../../assets/logo/Curtiss-bg-removed.png';
+import textLogo from '../../assets/logo/CurtissBooks Transparent Logo.png';
 
 export type NavItemKey =
   | 'dashboard'
@@ -115,18 +117,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="flex flex-col flex-1 overflow-hidden">
         {/* App Logo & Collapse Header */}
         <div className="h-14 px-3 flex items-center justify-between border-b border-zinc-100 dark:border-zinc-900">
-          <div className="flex items-center space-x-3 overflow-hidden">
-            <div className="w-8 h-8 rounded-lg bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 flex items-center justify-center font-bold text-xs tracking-tight shrink-0 shadow-xs">
-              CB
-            </div>
-            {!isCollapsed && (
-              <div className="overflow-hidden whitespace-nowrap">
-                <h1 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 tracking-tight leading-none">
-                  {tCommon('appName')}
-                </h1>
-                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5 truncate">
-                  {tCommon('appSubtitle', 'School Manager ERP')}
-                </p>
+          <div className="flex items-center space-x-2.5 overflow-hidden">
+            {isCollapsed ? (
+              <img src={appLogo} alt="Curtiss" className="w-8 h-8 object-contain shrink-0" />
+            ) : (
+              <div className="flex items-center space-x-2 overflow-hidden">
+                <img src={appLogo} alt="Curtiss" className="w-7 h-7 object-contain shrink-0" />
+                <img src={textLogo} alt="CurtissBooks" className="h-6 w-auto object-contain max-w-[155px]" />
               </div>
             )}
           </div>
@@ -214,8 +211,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </nav>
       </div>
 
-      {/* Footer Node Security Indicator */}
-      <div className="p-2.5 border-t border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950/40">
+      {/* Footer Node Security Indicator & Developer Credits */}
+      <div className="p-2.5 border-t border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950/40 space-y-2">
         <div className="flex items-center space-x-2">
           <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
           {!isCollapsed && (
@@ -229,6 +226,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           )}
         </div>
+        {!isCollapsed && (
+          <div className="text-[10px] text-zinc-400 dark:text-zinc-500 truncate pt-1.5 border-t border-zinc-200/60 dark:border-zinc-800/60 font-medium">
+            Developped By Curtiss &bull;{' '}
+            <span className="text-zinc-600 dark:text-zinc-300 font-semibold">www.trycurtiss.com</span>
+          </div>
+        )}
       </div>
     </aside>
   );

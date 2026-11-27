@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Lock, AlertCircle, LogOut, Shield, RotateCcw, Delete, KeyRound } from 'lucide-react';
 import { User } from '../../../shared/types/auth';
+import appLogo from '../../assets/logo/Curtiss-bg-removed.png';
 
 interface LockScreenModalProps {
   user: User;
@@ -133,9 +134,7 @@ export const LockScreenModal: React.FC<LockScreenModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/90 backdrop-blur-md select-none font-sans animate-in fade-in">
       <div className="max-w-xs w-full p-6 border border-zinc-800 bg-zinc-900 rounded-2xl shadow-2xl text-center space-y-4">
-        <div className="w-12 h-12 rounded-full bg-zinc-800 border border-zinc-700 mx-auto flex items-center justify-center text-zinc-200 shadow-inner">
-          <Lock className="w-5 h-5 text-amber-400" />
-        </div>
+        <img src={appLogo} alt="Curtiss" className="w-12 h-12 object-contain mx-auto drop-shadow-xs" />
 
         <div>
           <h2 className="text-base font-bold text-zinc-100">{t('lock.pinTitle')}</h2>
@@ -287,6 +286,10 @@ export const LockScreenModal: React.FC<LockScreenModalProps> = ({
             </div>
           </form>
         )}
+
+        <div className="pt-2 text-[10px] text-zinc-500 text-center font-medium border-t border-zinc-800/60">
+          Developped By Curtiss &bull; <span className="text-zinc-400 font-semibold">www.trycurtiss.com</span>
+        </div>
       </div>
     </div>
   );

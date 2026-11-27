@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Minus, Square, Copy, X, Database } from 'lucide-react';
+import appLogo from '../../assets/logo/Curtiss-bg-removed.png';
 
 interface TitleBarProps {
   isDbConnected?: boolean;
@@ -57,9 +58,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({ isDbConnected = true }) => {
       {/* Left: Branding & Status */}
       <div className="flex items-center space-x-3 px-3 titlebar-drag-region">
         <div className="flex items-center space-x-2">
-          <div className="w-4 h-4 rounded bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 flex items-center justify-center font-bold text-[10px]">
-            C
-          </div>
+          <img src={appLogo} alt="Curtiss" className="w-4 h-4 object-contain" />
           <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 tracking-wide">
             {schoolName ? `${t('appName')} — ${schoolName}` : t('appName')}
           </span>

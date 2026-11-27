@@ -22,6 +22,7 @@ import { FinancialReportsView } from './components/pages/FinancialReportsView';
 import { AuditLogsView } from './components/pages/AuditLogsView';
 import { SetupView } from './components/auth/SetupView';
 import { LoginView } from './components/auth/LoginView';
+import { SplashScreen } from './components/common/SplashScreen';
 import { LockScreenModal } from './components/auth/LockScreenModal';
 import { AccessDeniedView } from './components/auth/AccessDeniedView';
 import { ToastProvider, useToast } from './components/ui/Toast';
@@ -71,6 +72,7 @@ export const AppContent: React.FC = () => {
   const { i18n } = useTranslation();
   const { success } = useToast();
 
+  const [showSplash, setShowSplash] = useState(true);
   const [authState, setAuthState] = useState<'checking' | 'setup' | 'unauthenticated' | 'authenticated'>('checking');
   const [session, setSession] = useState<AuthSession | null>(null);
 
@@ -166,6 +168,11 @@ export const AppContent: React.FC = () => {
       setSession({ ...session, isLocked: false });
     }
   };
+
+  // 0. Initial App Splash Screen (Lottie Animation + 3s hold)
+  if (showSplash) {
+    return <SplashScreen onComplete={() => setShowSplash(false)} />;
+  }
 
   // 1. Initial State: Checking
   if (authState === 'checking') {

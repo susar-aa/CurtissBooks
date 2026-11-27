@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Shield, Delete, RotateCcw, AlertCircle, Lock, KeyRound, ArrowRight, UserCheck } from 'lucide-react';
-import { Languages } from 'lucide-react';
+import { Shield, Delete, RotateCcw, AlertCircle, Lock, KeyRound, ArrowRight, UserCheck, Languages } from 'lucide-react';
 import { AuthSession } from '../../../shared/types/auth';
+import appLogo from '../../assets/logo/Curtiss-bg-removed.png';
+import textLogo from '../../assets/logo/CurtissBooks Transparent Logo.png';
 
 interface LoginViewProps {
   onLoginSuccess: (session: AuthSession) => void;
@@ -149,17 +150,8 @@ export const LoginView: React.FC<LoginViewProps> = ({
       {/* Top Header */}
       <div className="flex items-center justify-between max-w-xl mx-auto w-full pt-2">
         <div className="flex items-center space-x-2.5">
-          <div className="w-8 h-8 rounded-xl bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 flex items-center justify-center font-bold text-xs shadow-md">
-            CB
-          </div>
-          <div>
-            <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
-              {tCommon('appName')}
-            </div>
-            <div className="text-[10px] text-zinc-500 dark:text-zinc-400">
-              {tCommon('schoolName')}
-            </div>
-          </div>
+          <img src={appLogo} alt="Curtiss" className="w-8 h-8 object-contain shrink-0" />
+          <img src={textLogo} alt="CurtissBooks" className="h-6 w-auto object-contain" />
         </div>
 
         {/* Language selector toggle */}
@@ -198,9 +190,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
           /* ==================== 5-DIGIT PIN AUTHENTICATION ==================== */
           <div className="space-y-5">
             <div className="text-center space-y-1">
-              <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700/80 mx-auto flex items-center justify-center text-zinc-900 dark:text-zinc-100 shadow-inner mb-2.5">
-                <Shield className="w-6 h-6 text-zinc-900 dark:text-zinc-100" />
-              </div>
+              <img src={appLogo} alt="Curtiss" className="w-14 h-14 object-contain mx-auto mb-2 drop-shadow-xs" />
               <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
                 {t('login.pinTitle')}
               </h2>
@@ -237,11 +227,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
                   </div>
                 );
               })}
-            </div>
-
-            {/* Hint Notice */}
-            <div className="text-[11px] text-center text-zinc-400 dark:text-zinc-500">
-              {t('login.defaultPinHint')}
             </div>
 
             {/* Tactile Keypad */}
@@ -308,9 +293,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
           /* ==================== FALLBACK: USERNAME & PASSWORD ==================== */
           <div className="space-y-4">
             <div className="text-center space-y-1">
-              <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 mx-auto flex items-center justify-center text-zinc-900 dark:text-zinc-100 shadow-inner mb-2">
-                <Lock className="w-6 h-6" />
-              </div>
+              <img src={appLogo} alt="Curtiss" className="w-14 h-14 object-contain mx-auto mb-2 drop-shadow-xs" />
               <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
                 {t('login.title')}
               </h2>
@@ -383,9 +366,15 @@ export const LoginView: React.FC<LoginViewProps> = ({
         )}
       </div>
 
-      {/* Footer Branding */}
-      <div className="text-center text-[11px] text-zinc-400 dark:text-zinc-500 pb-2">
-        {t('login.offlineNotice')}
+      {/* Footer Branding & Developer Credits */}
+      <div className="text-center space-y-1.5 pb-2">
+        <div className="text-[11px] text-zinc-400 dark:text-zinc-500">
+          {t('login.offlineNotice')}
+        </div>
+        <div className="text-xs font-medium text-zinc-500 dark:text-zinc-400 tracking-wide">
+          Developped By Curtiss &bull;{' '}
+          <span className="text-zinc-700 dark:text-zinc-300 font-semibold">www.trycurtiss.com</span>
+        </div>
       </div>
     </div>
   );

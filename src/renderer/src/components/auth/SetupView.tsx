@@ -4,6 +4,8 @@ import { ShieldCheck, Lock, Languages, AlertCircle, KeyRound, CheckCircle2, Shie
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { AuthSession } from '../../../shared/types/auth';
+import appLogo from '../../assets/logo/Curtiss-bg-removed.png';
+import textLogo from '../../assets/logo/CurtissBooks Transparent Logo.png';
 
 interface SetupViewProps {
   onSetupComplete: (session: AuthSession) => void;
@@ -109,17 +111,8 @@ export const SetupView: React.FC<SetupViewProps> = ({
       {/* Header bar with Language Toggle */}
       <div className="flex items-center justify-between max-w-xl mx-auto w-full pt-4">
         <div className="flex items-center space-x-2.5">
-          <div className="w-8 h-8 rounded-xl bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 flex items-center justify-center font-bold text-xs shadow-md">
-            CB
-          </div>
-          <div>
-            <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
-              {tCommon('appName')}
-            </div>
-            <div className="text-[10px] text-zinc-500 dark:text-zinc-400">
-              {tCommon('schoolName')}
-            </div>
-          </div>
+          <img src={appLogo} alt="Curtiss" className="w-8 h-8 object-contain shrink-0" />
+          <img src={textLogo} alt="CurtissBooks" className="h-6 w-auto object-contain" />
         </div>
 
         <div className="flex items-center space-x-1 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-lg p-0.5 text-xs shadow-xs">
@@ -157,9 +150,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
           /* ==================== STEP 1: DEVELOPER PIN AUTHORIZATION ==================== */
           <div className="space-y-6">
             <div className="text-center space-y-2">
-              <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 mx-auto flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-2 shadow-inner">
-                <KeyRound className="w-7 h-7" />
-              </div>
+              <img src={appLogo} alt="Curtiss" className="w-14 h-14 object-contain mx-auto mb-2 drop-shadow-xs" />
               <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
                 {t('setup.developerLicense.title')}
               </h2>
@@ -203,9 +194,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
           /* ==================== STEP 2: INITIAL ADMIN PROVISIONING ==================== */
           <div className="space-y-6">
             <div className="text-center space-y-2">
-              <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 mx-auto flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-2 shadow-inner">
-                <ShieldCheck className="w-6 h-6" />
-              </div>
+              <img src={appLogo} alt="Curtiss" className="w-14 h-14 object-contain mx-auto mb-2 drop-shadow-xs" />
 
               {/* Developer Verified Badge */}
               <div className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
@@ -299,9 +288,15 @@ export const SetupView: React.FC<SetupViewProps> = ({
         )}
       </div>
 
-      {/* Footer Branding */}
-      <div className="text-center text-[11px] text-zinc-400 dark:text-zinc-500 pb-2">
-        {t('login.offlineNotice')}
+      {/* Footer Branding & Developer Credits */}
+      <div className="text-center space-y-1.5 pb-2">
+        <div className="text-[11px] text-zinc-400 dark:text-zinc-500">
+          {t('login.offlineNotice')}
+        </div>
+        <div className="text-xs font-medium text-zinc-500 dark:text-zinc-400 tracking-wide">
+          Developped By Curtiss &bull;{' '}
+          <span className="text-zinc-700 dark:text-zinc-300 font-semibold">www.trycurtiss.com</span>
+        </div>
       </div>
     </div>
   );
