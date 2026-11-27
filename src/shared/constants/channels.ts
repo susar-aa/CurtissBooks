@@ -13,6 +13,8 @@ export const IPC_CHANNELS = {
   SETTINGS_GET: 'settings:get',
   SETTINGS_SET: 'settings:set',
   SETTINGS_FACTORY_RESET: 'settings:factoryReset',
+  SETTINGS_GET_OPENING_BALANCES: 'settings:getOpeningBalances',
+  SETTINGS_UPDATE_OPENING_BALANCES: 'settings:updateOpeningBalances',
 
   // Authentication & Session
   AUTH_CHECK_SETUP: 'auth:checkSetup',

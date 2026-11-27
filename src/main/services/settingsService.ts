@@ -1,5 +1,32 @@
 import { getDatabase } from '../db';
 import { CryptoService } from './cryptoService';
+import { AuditService } from './auditService';
+
+export interface BankAccountOpeningBalance {
+  id: number;
+  account_code: string;
+  bank_name: string;
+  branch_name: string;
+  account_number: string;
+  account_type: string;
+  opening_balance_cents: number;
+  current_balance_cents: number;
+}
+
+export interface OpeningBalancesData {
+  financialYear: {
+    id: number;
+    year_name: string;
+    start_date: string;
+    end_date: string;
+    is_current: boolean;
+  } | null;
+  cashOpeningBalanceCents: number;
+  cashCurrentBalanceCents: number;
+  pettyCashOpeningBalanceCents: number;
+  pettyCashCurrentBalanceCents: number;
+  bankAccounts: BankAccountOpeningBalance[];
+}
 
 export class SettingsService {
   public static getAll(): Record<string, string> {
@@ -135,6 +162,279 @@ export class SettingsService {
     resetTransaction();
     db.pragma('foreign_keys = ON');
 
+    return true;
+  }
+
+  /**
+   * Retrieves opening balances for Cash in Hand, Bank Accounts, and Petty Cash Float.
+   */
+  public static getOpeningBalances(financialYearId?: number): OpeningBalancesData {
+    const db = getDatabase();
+
+    // 1. Resolve Financial Year
+    let fy: any = null;
+    if (financialYearId) {
+      fy = db.prepare(`
+        SELECT id, year_name, start_date, end_date, is_current
+        FROM financial_years
+        WHERE id = ?
+      `).get(financialYearId);
+    }
+
+    if (!fy) {
+      fy = db.prepare(`
+        SELECT id, year_name, start_date, end_date, is_current
+        FROM financial_years
+        WHERE is_current = 1
+        ORDER BY id DESC LIMIT 1
+      `).get();
+    }
+
+    if (!fy) {
+      fy = db.prepare(`
+        SELECT id, year_name, start_date, end_date, is_current
+        FROM financial_years
+        ORDER BY id DESC LIMIT 1
+      `).get();
+    }
+
+    const yearId = fy ? fy.id : 1;
+
+    // 2. Cash in Hand Opening & Current Balance
+    const cashOpnRow = db.prepare(`
+      SELECT amount_cents
+      FROM cash_transactions
+      WHERE financial_year_id = ? AND reference_no = 'OPN-CASH'
+      LIMIT 1
+    `).get(yearId) as { amount_cents: number } | undefined;
+
+    let cashOpeningBalanceCents = cashOpnRow ? Number(cashOpnRow.amount_cents) : 0;
+    if (!cashOpnRow) {
+      const settingVal = this.get(`opening_balance_cash_cents_${yearId}`) || this.get('opening_balance_cash_cents');
+      if (settingVal) cashOpeningBalanceCents = Number(settingVal);
+    }
+
+    const lastCashRow = db.prepare(`
+      SELECT running_balance_cents
+      FROM cash_transactions
+      WHERE financial_year_id = ?
+      ORDER BY id DESC LIMIT 1
+    `).get(yearId) as { running_balance_cents: number } | undefined;
+    const cashCurrentBalanceCents = lastCashRow ? Number(lastCashRow.running_balance_cents) : cashOpeningBalanceCents;
+
+    // 3. Petty Cash Float Opening & Current Balance
+    const pettyOpnRow = db.prepare(`
+      SELECT amount_cents
+      FROM petty_cash_vouchers
+      WHERE financial_year_id = ? AND voucher_no = 'OPN-PETTY-CASH'
+      LIMIT 1
+    `).get(yearId) as { amount_cents: number } | undefined;
+
+    let pettyCashOpeningBalanceCents = pettyOpnRow ? Number(pettyOpnRow.amount_cents) : 0;
+    if (!pettyOpnRow) {
+      const settingVal = this.get(`opening_balance_petty_cash_cents_${yearId}`) || this.get('opening_balance_petty_cash_cents');
+      if (settingVal) pettyCashOpeningBalanceCents = Number(settingVal);
+    }
+
+    const pettyBalRow = db.prepare(`
+      SELECT COALESCE(SUM(CASE WHEN type IN ('replenishment', 'transfer_in') AND status = 'approved' THEN amount_cents ELSE -amount_cents END), 0) as bal
+      FROM petty_cash_vouchers
+      WHERE financial_year_id = ? AND status = 'approved'
+    `).get(yearId) as { bal: number } | undefined;
+    const pettyCashCurrentBalanceCents = pettyBalRow ? Number(pettyBalRow.bal) : pettyCashOpeningBalanceCents;
+
+    // 4. Active Bank Accounts
+    const bankAccounts = db.prepare(`
+      SELECT id, account_code, bank_name, branch_name, account_number, account_type,
+             opening_balance_cents, current_balance_cents
+      FROM bank_accounts
+      WHERE status = 'active'
+      ORDER BY id ASC
+    `).all() as BankAccountOpeningBalance[];
+
+    return {
+      financialYear: fy ? {
+        id: fy.id,
+        year_name: fy.year_name,
+        start_date: fy.start_date,
+        end_date: fy.end_date,
+        is_current: Boolean(fy.is_current),
+      } : null,
+      cashOpeningBalanceCents,
+      cashCurrentBalanceCents,
+      pettyCashOpeningBalanceCents,
+      pettyCashCurrentBalanceCents,
+      bankAccounts,
+    };
+  }
+
+  /**
+   * Sets or adjusts opening balances for Cash in Hand, Bank Accounts, and Petty Cash Float.
+   * Synchronizes opening vouchers, running balance ledgers, and database records atomically.
+   */
+  public static updateOpeningBalances(
+    data: {
+      financialYearId?: number;
+      cashOpeningBalanceCents: number;
+      pettyCashOpeningBalanceCents: number;
+      bankAccounts: Array<{
+        id: number;
+        opening_balance_cents: number;
+      }>;
+    },
+    userId?: number
+  ): boolean {
+    const db = getDatabase();
+
+    // 1. Resolve Financial Year
+    let fy: any = null;
+    if (data.financialYearId) {
+      fy = db.prepare(`
+        SELECT id, year_name, start_date, end_date
+        FROM financial_years
+        WHERE id = ?
+      `).get(data.financialYearId);
+    }
+    if (!fy) {
+      fy = db.prepare(`
+        SELECT id, year_name, start_date, end_date
+        FROM financial_years
+        WHERE is_current = 1
+        ORDER BY id DESC LIMIT 1
+      `).get();
+    }
+    if (!fy) {
+      fy = db.prepare(`
+        SELECT id, year_name, start_date, end_date
+        FROM financial_years
+        ORDER BY id DESC LIMIT 1
+      `).get();
+    }
+
+    const yearId = fy ? fy.id : 1;
+    const txDate = fy ? fy.start_date : new Date().toISOString().split('T')[0];
+
+    const tx = db.transaction(() => {
+      // A. Update Bank Accounts Opening Balances
+      if (Array.isArray(data.bankAccounts)) {
+        for (const item of data.bankAccounts) {
+          const bank = db.prepare(`
+            SELECT id, opening_balance_cents, current_balance_cents
+            FROM bank_accounts
+            WHERE id = ?
+          `).get(item.id) as { id: number; opening_balance_cents: number; current_balance_cents: number } | undefined;
+
+          if (bank) {
+            const oldOpen = Number(bank.opening_balance_cents || 0);
+            const newOpen = Math.max(0, Math.round(Number(item.opening_balance_cents || 0)));
+            const delta = newOpen - oldOpen;
+
+            db.prepare(`
+              UPDATE bank_accounts
+              SET opening_balance_cents = ?,
+                  current_balance_cents = current_balance_cents + ?,
+                  updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `).run(newOpen, delta, item.id);
+          }
+        }
+      }
+
+      // B. Update Cash in Hand Opening Balance
+      const cashCents = Math.max(0, Math.round(Number(data.cashOpeningBalanceCents || 0)));
+      this.set('opening_balance_cash_cents', String(cashCents), 'Opening Balance for Cash in Hand');
+      this.set(`opening_balance_cash_cents_${yearId}`, String(cashCents), `Opening Balance for Cash in Hand FY ${yearId}`);
+
+      const existingCashOpn = db.prepare(`
+        SELECT id
+        FROM cash_transactions
+        WHERE financial_year_id = ? AND reference_no = 'OPN-CASH'
+        LIMIT 1
+      `).get(yearId) as { id: number } | undefined;
+
+      if (existingCashOpn) {
+        if (cashCents > 0) {
+          db.prepare(`
+            UPDATE cash_transactions
+            SET amount_cents = ?,
+                transaction_date = ?,
+                description = 'Cash in Hand Opening Balance'
+            WHERE id = ?
+          `).run(cashCents, txDate, existingCashOpn.id);
+        } else {
+          db.prepare('DELETE FROM cash_transactions WHERE id = ?').run(existingCashOpn.id);
+        }
+      } else if (cashCents > 0) {
+        db.prepare(`
+          INSERT INTO cash_transactions (
+            financial_year_id, transaction_date, transaction_type,
+            amount_cents, running_balance_cents, reference_no, description, created_by
+          ) VALUES (?, ?, 'adjustment', ?, ?, 'OPN-CASH', 'Cash in Hand Opening Balance', ?)
+        `).run(yearId, txDate, cashCents, cashCents, userId || null);
+      }
+
+      // Recalculate running_balance_cents for all cash transactions in this financial year
+      const allCashTx = db.prepare(`
+        SELECT id, amount_cents
+        FROM cash_transactions
+        WHERE financial_year_id = ?
+        ORDER BY transaction_date ASC, id ASC
+      `).all(yearId) as { id: number; amount_cents: number }[];
+
+      let cashRunning = 0;
+      const updateCashRunning = db.prepare('UPDATE cash_transactions SET running_balance_cents = ? WHERE id = ?');
+      for (const ctx of allCashTx) {
+        cashRunning += Number(ctx.amount_cents || 0);
+        updateCashRunning.run(cashRunning, ctx.id);
+      }
+
+      // C. Update Petty Cash Float Opening Balance
+      const pettyCents = Math.max(0, Math.round(Number(data.pettyCashOpeningBalanceCents || 0)));
+      this.set('opening_balance_petty_cash_cents', String(pettyCents), 'Opening Balance for Petty Cash Float');
+      this.set(`opening_balance_petty_cash_cents_${yearId}`, String(pettyCents), `Opening Balance for Petty Cash Float FY ${yearId}`);
+
+      const existingPettyOpn = db.prepare(`
+        SELECT id
+        FROM petty_cash_vouchers
+        WHERE financial_year_id = ? AND voucher_no = 'OPN-PETTY-CASH'
+        LIMIT 1
+      `).get(yearId) as { id: number } | undefined;
+
+      if (existingPettyOpn) {
+        if (pettyCents > 0) {
+          db.prepare(`
+            UPDATE petty_cash_vouchers
+            SET amount_cents = ?,
+                voucher_date = ?,
+                description = 'Opening Petty Cash Float',
+                payee = 'School Impress / Float Opening',
+                type = 'replenishment',
+                status = 'approved'
+            WHERE id = ?
+          `).run(pettyCents, txDate, existingPettyOpn.id);
+        } else {
+          db.prepare('DELETE FROM petty_cash_vouchers WHERE id = ?').run(existingPettyOpn.id);
+        }
+      } else if (pettyCents > 0) {
+        db.prepare(`
+          INSERT INTO petty_cash_vouchers (
+            voucher_no, voucher_date, financial_year_id,
+            type, amount_cents, payee, description, receipt_attached, status, created_by
+          ) VALUES ('OPN-PETTY-CASH', ?, ?, 'replenishment', ?, 'School Impress / Float Opening', 'Opening Petty Cash Float', 0, 'approved', ?)
+        `).run(txDate, yearId, pettyCents, userId || null);
+      }
+
+      AuditService.logAuthEvent(
+        userId || null,
+        'system',
+        'OPENING_BALANCES_UPDATED',
+        `fy:${yearId}`,
+        'success',
+        `Cash: Rs. ${(cashCents / 100).toFixed(2)}, Petty: Rs. ${(pettyCents / 100).toFixed(2)}`
+      );
+    });
+
+    tx();
     return true;
   }
 }

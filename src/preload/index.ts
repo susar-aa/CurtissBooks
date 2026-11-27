@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS } from '../shared/constants/channels';
-import { ElectronAPI, IpcResult } from '../shared/types/ipc';
+import { ElectronAPI, IpcResult, OpeningBalancesData } from '../shared/types/ipc';
 import { AppInfo } from '../shared/types/settings';
 import { AuthSession, User, Role, Permission, AuditLogItem } from '../shared/types/auth';
 import {
@@ -33,6 +33,15 @@ const api: ElectronAPI = {
     get: (key: string): Promise<IpcResult<string | null>> => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET, key),
     set: (key: string, value: string): Promise<IpcResult<boolean>> => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET, key, value),
     factoryReset: (adminPin: string): Promise<IpcResult<boolean>> => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_FACTORY_RESET, adminPin),
+    getOpeningBalances: (financialYearId?: number): Promise<IpcResult<OpeningBalancesData>> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET_OPENING_BALANCES, financialYearId),
+    updateOpeningBalances: (data: {
+      financialYearId?: number;
+      cashOpeningBalanceCents: number;
+      pettyCashOpeningBalanceCents: number;
+      bankAccounts: Array<{ id: number; opening_balance_cents: number }>;
+    }): Promise<IpcResult<boolean>> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_UPDATE_OPENING_BALANCES, data),
   },
   auth: {
     checkSetup: (): Promise<IpcResult<{ setupRequired: boolean }>> =>

@@ -1,7 +1,8 @@
 import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../shared/constants/channels';
-import { SettingsService } from '../services/settingsService';
-import { setCurrentSessionToken } from './authHandlers';
+import { SettingsService, OpeningBalancesData } from '../services/settingsService';
+import { AuthService } from '../services/authService';
+import { setCurrentSessionToken, getCurrentSessionToken } from './authHandlers';
 import { IpcResult } from '../../shared/types/ipc';
 
 export function registerSettingsHandlers(): void {
@@ -45,5 +46,40 @@ export function registerSettingsHandlers(): void {
       return { success: false, error };
     }
   });
-}
 
+  ipcMain.handle(
+    IPC_CHANNELS.SETTINGS_GET_OPENING_BALANCES,
+    async (_event, financialYearId?: number): Promise<IpcResult<OpeningBalancesData>> => {
+      try {
+        const data = SettingsService.getOpeningBalances(financialYearId);
+        return { success: true, data };
+      } catch (err: unknown) {
+        const error = err instanceof Error ? err.message : String(err);
+        return { success: false, error };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.SETTINGS_UPDATE_OPENING_BALANCES,
+    async (
+      _event,
+      payload: {
+        financialYearId?: number;
+        cashOpeningBalanceCents: number;
+        pettyCashOpeningBalanceCents: number;
+        bankAccounts: Array<{ id: number; opening_balance_cents: number }>;
+      }
+    ): Promise<IpcResult<boolean>> => {
+      try {
+        const token = getCurrentSessionToken();
+        const session = token ? AuthService.validateSession(token) : null;
+        const ok = SettingsService.updateOpeningBalances(payload, session?.user?.id);
+        return { success: true, data: ok };
+      } catch (err: unknown) {
+        const error = err instanceof Error ? err.message : String(err);
+        return { success: false, error };
+      }
+    }
+  );
+}

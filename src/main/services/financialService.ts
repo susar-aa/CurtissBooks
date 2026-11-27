@@ -7110,6 +7110,15 @@ export class FinancialService {
       `).get(startDate) as any;
       if (cashLast) {
         openingBalanceCents += Number(cashLast.running_balance_cents || 0);
+      } else {
+        const cashOpen = db.prepare(`
+          SELECT amount_cents
+          FROM cash_transactions
+          WHERE financial_year_id = ? AND reference_no = 'OPN-CASH'
+        `).get(params.financialYearId) as any;
+        if (cashOpen) {
+          openingBalanceCents += Number(cashOpen.amount_cents || 0);
+        }
       }
     }
 

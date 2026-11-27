@@ -22,6 +22,32 @@ export interface IpcResult<T = unknown> {
   error?: string;
 }
 
+export interface BankAccountOpeningBalance {
+  id: number;
+  account_code: string;
+  bank_name: string;
+  branch_name: string;
+  account_number: string;
+  account_type: string;
+  opening_balance_cents: number;
+  current_balance_cents: number;
+}
+
+export interface OpeningBalancesData {
+  financialYear: {
+    id: number;
+    year_name: string;
+    start_date: string;
+    end_date: string;
+    is_current: boolean;
+  } | null;
+  cashOpeningBalanceCents: number;
+  cashCurrentBalanceCents: number;
+  pettyCashOpeningBalanceCents: number;
+  pettyCashCurrentBalanceCents: number;
+  bankAccounts: BankAccountOpeningBalance[];
+}
+
 export interface ElectronAPI {
   window: {
     minimize: () => Promise<void>;
@@ -38,6 +64,13 @@ export interface ElectronAPI {
     get: (key: string) => Promise<IpcResult<string | null>>;
     set: (key: string, value: string) => Promise<IpcResult<boolean>>;
     factoryReset: (adminPin: string) => Promise<IpcResult<boolean>>;
+    getOpeningBalances: (financialYearId?: number) => Promise<IpcResult<OpeningBalancesData>>;
+    updateOpeningBalances: (data: {
+      financialYearId?: number;
+      cashOpeningBalanceCents: number;
+      pettyCashOpeningBalanceCents: number;
+      bankAccounts: Array<{ id: number; opening_balance_cents: number }>;
+    }) => Promise<IpcResult<boolean>>;
   };
   auth: {
     checkSetup: () => Promise<IpcResult<{ setupRequired: boolean }>>;

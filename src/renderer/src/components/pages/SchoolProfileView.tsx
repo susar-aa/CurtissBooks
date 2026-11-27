@@ -1,6 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { School, Building, Mail, Phone, User, Calendar, Image as ImageIcon, Save, CheckCircle2, AlertCircle, AlertTriangle, Trash2, ShieldAlert } from 'lucide-react';
+import {
+  School,
+  Building,
+  Mail,
+  Phone,
+  User,
+  Calendar,
+  Image as ImageIcon,
+  Save,
+  CheckCircle2,
+  AlertCircle,
+  AlertTriangle,
+  Trash2,
+  ShieldAlert,
+  Wallet,
+  Coins,
+  Building2,
+  Landmark,
+} from 'lucide-react';
 import { PageHeader } from '../ui/PageHeader';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -8,6 +26,7 @@ import { Textarea } from '../ui/Textarea';
 import { Modal } from '../ui/Modal';
 import { useToast } from '../ui/Toast';
 import { SchoolProfile } from '../../../shared/types/school';
+import { OpeningBalancesData } from '../../../shared/types/ipc';
 
 export const SchoolProfileView: React.FC = () => {
   const { t } = useTranslation('school');
@@ -16,6 +35,13 @@ export const SchoolProfileView: React.FC = () => {
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Opening Balances States
+  const [openingData, setOpeningData] = useState<OpeningBalancesData | null>(null);
+  const [cashOpeningInput, setCashOpeningInput] = useState('');
+  const [pettyOpeningInput, setPettyOpeningInput] = useState('');
+  const [bankOpeningInputs, setBankOpeningInputs] = useState<Record<number, string>>({});
+  const [savingOpening, setSavingOpening] = useState(false);
 
   // Factory Reset States
   const [resetModalOpen, setResetModalOpen] = useState(false);
@@ -54,9 +80,80 @@ export const SchoolProfileView: React.FC = () => {
     }
   };
 
+  const loadOpeningBalances = async () => {
+    try {
+      if (window.curtissApi?.settings?.getOpeningBalances) {
+        const res = await window.curtissApi.settings.getOpeningBalances();
+        if (res.success && res.data) {
+          setOpeningData(res.data);
+          setCashOpeningInput(
+            res.data.cashOpeningBalanceCents ? (res.data.cashOpeningBalanceCents / 100).toFixed(2) : ''
+          );
+          setPettyOpeningInput(
+            res.data.pettyCashOpeningBalanceCents ? (res.data.pettyCashOpeningBalanceCents / 100).toFixed(2) : ''
+          );
+          const bankInputs: Record<number, string> = {};
+          for (const b of res.data.bankAccounts) {
+            bankInputs[b.id] = b.opening_balance_cents ? (b.opening_balance_cents / 100).toFixed(2) : '';
+          }
+          setBankOpeningInputs(bankInputs);
+        }
+      }
+    } catch (err: unknown) {
+      console.error('Failed to load opening balances:', err);
+    }
+  };
+
   useEffect(() => {
     loadProfile();
+    loadOpeningBalances();
   }, []);
+
+  const handleSaveOpeningBalances = async () => {
+    setSavingOpening(true);
+    try {
+      const cashVal = parseFloat(cashOpeningInput || '0');
+      const pettyVal = parseFloat(pettyOpeningInput || '0');
+
+      if (isNaN(cashVal) || cashVal < 0 || isNaN(pettyVal) || pettyVal < 0) {
+        toastError('Invalid Amount', 'Opening balance values must be non-negative numbers.');
+        return;
+      }
+
+      const bankPayload: Array<{ id: number; opening_balance_cents: number }> = [];
+      if (openingData?.bankAccounts) {
+        for (const b of openingData.bankAccounts) {
+          const val = parseFloat(bankOpeningInputs[b.id] || '0');
+          if (isNaN(val) || val < 0) {
+            toastError('Invalid Amount', `Opening balance for ${b.bank_name} must be a non-negative number.`);
+            return;
+          }
+          bankPayload.push({
+            id: b.id,
+            opening_balance_cents: Math.round(val * 100),
+          });
+        }
+      }
+
+      const res = await window.curtissApi.settings.updateOpeningBalances({
+        financialYearId: openingData?.financialYear?.id,
+        cashOpeningBalanceCents: Math.round(cashVal * 100),
+        pettyCashOpeningBalanceCents: Math.round(pettyVal * 100),
+        bankAccounts: bankPayload,
+      });
+
+      if (res.success) {
+        success(t('openingBalances.saveSuccess'));
+        await loadOpeningBalances();
+      } else {
+        toastError(res.error || t('openingBalances.saveError'));
+      }
+    } catch (err: unknown) {
+      toastError(err instanceof Error ? err.message : t('openingBalances.saveError'));
+    } finally {
+      setSavingOpening(false);
+    }
+  };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -382,7 +479,202 @@ export const SchoolProfileView: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 5: Danger Zone - Factory Reset */}
+        {/* Section 5: Account Opening Balances */}
+        <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 shadow-sm space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <Landmark className="w-5 h-5 text-indigo-400" />
+              <div>
+                <h2 className="text-base font-semibold text-slate-100">
+                  {t('openingBalances.title')}
+                </h2>
+                <p className="text-xs text-slate-400">
+                  {t('openingBalances.subtitle')}
+                </p>
+              </div>
+            </div>
+            {openingData?.financialYear && (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+                {t('openingBalances.financialYear')}: {openingData.financialYear.year_name}
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Cash in Hand Opening Balance Card */}
+            <div className="p-5 rounded-xl bg-slate-950/50 border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+                    <Wallet className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-200">
+                      {t('openingBalances.cashInHand')}
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      {t('openingBalances.cashInHandHelp')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <div className="flex items-center justify-between text-xs mb-1.5">
+                  <span className="text-slate-400">{t('openingBalances.currentCashBalance')}:</span>
+                  <span className="font-mono font-semibold text-emerald-400">
+                    Rs. {((openingData?.cashCurrentBalanceCents || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-xs font-semibold text-slate-500">
+                    Rs.
+                  </span>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={cashOpeningInput}
+                    onChange={(e) => setCashOpeningInput(e.target.value)}
+                    placeholder="0.00"
+                    className="pl-9 font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Petty Cash Float Opening Balance Card */}
+            <div className="p-5 rounded-xl bg-slate-950/50 border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
+                    <Coins className="w-4 h-4 text-amber-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-200">
+                      {t('openingBalances.pettyCash')}
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      {t('openingBalances.pettyCashHelp')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <div className="flex items-center justify-between text-xs mb-1.5">
+                  <span className="text-slate-400">{t('openingBalances.currentPettyBalance')}:</span>
+                  <span className="font-mono font-semibold text-amber-400">
+                    Rs. {((openingData?.pettyCashCurrentBalanceCents || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-xs font-semibold text-slate-500">
+                    Rs.
+                  </span>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={pettyOpeningInput}
+                    onChange={(e) => setPettyOpeningInput(e.target.value)}
+                    placeholder="0.00"
+                    className="pl-9 font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Bank Accounts Opening Balances */}
+          <div className="p-5 rounded-xl bg-slate-950/50 border border-slate-800 space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/30 flex items-center justify-center">
+                <Building2 className="w-4 h-4 text-blue-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-slate-200">
+                  {t('openingBalances.bankAccounts')}
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  {t('openingBalances.bankAccountsHelp')}
+                </p>
+              </div>
+            </div>
+
+            {(!openingData?.bankAccounts || openingData.bankAccounts.length === 0) ? (
+              <div className="p-3 text-xs text-slate-400 bg-slate-900/50 rounded-lg border border-slate-800">
+                {t('openingBalances.noBankAccounts')}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                    <tr>
+                      <th className="pb-2">{t('openingBalances.accountCode')}</th>
+                      <th className="pb-2">{t('openingBalances.bankName')}</th>
+                      <th className="pb-2">{t('openingBalances.accountNumber')}</th>
+                      <th className="pb-2">{t('openingBalances.accountType')}</th>
+                      <th className="pb-2 text-right">{t('openingBalances.currentBalance')}</th>
+                      <th className="pb-2 w-48 text-right">{t('openingBalances.openingBalance')}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {openingData.bankAccounts.map((b) => (
+                      <tr key={b.id} className="hover:bg-slate-900/40">
+                        <td className="py-2.5 font-mono font-semibold text-slate-300">{b.account_code}</td>
+                        <td className="py-2.5 text-slate-200 font-medium">
+                          {b.bank_name} <span className="text-slate-400 font-normal">({b.branch_name})</span>
+                        </td>
+                        <td className="py-2.5 font-mono text-slate-300">{b.account_number}</td>
+                        <td className="py-2.5 text-slate-400 capitalize">{b.account_type}</td>
+                        <td className="py-2.5 font-mono text-right font-semibold text-blue-400">
+                          Rs. {(b.current_balance_cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-2.5 pl-4">
+                          <div className="relative">
+                            <span className="absolute left-2.5 top-2 text-xs font-semibold text-slate-500">
+                              Rs.
+                            </span>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={bankOpeningInputs[b.id] ?? ''}
+                              onChange={(e) =>
+                                setBankOpeningInputs((prev) => ({
+                                  ...prev,
+                                  [b.id]: e.target.value,
+                                }))
+                              }
+                              placeholder="0.00"
+                              className="pl-8 text-right font-mono h-8 text-xs"
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end pt-1">
+            <Button
+              type="button"
+              variant="primary"
+              onClick={handleSaveOpeningBalances}
+              isLoading={savingOpening}
+              className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
+            >
+              <Save className="w-4 h-4" />
+              <span>{t('openingBalances.saveButton')}</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* Section 6: Danger Zone - Factory Reset */}
         <div className="p-6 rounded-2xl bg-red-950/20 border border-red-900/50 shadow-sm space-y-4">
           <div className="flex items-center justify-between border-b border-red-900/40 pb-3">
             <div className="flex items-center gap-2">
