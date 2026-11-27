@@ -43,23 +43,27 @@ export interface ElectronAPI {
     setupInitialAdmin: (data: {
       fullName: string;
       username: string;
-      password: string;
+      password?: string;
+      pin?: string;
     }) => Promise<IpcResult<AuthSession>>;
     login: (credentials: {
       username: string;
       password: string;
     }) => Promise<IpcResult<AuthSession>>;
+    loginWithPin: (pin: string) => Promise<IpcResult<AuthSession>>;
     logout: () => Promise<IpcResult<boolean>>;
     getCurrentSession: () => Promise<IpcResult<AuthSession | null>>;
     lockSession: () => Promise<IpcResult<boolean>>;
     unlockSession: (password: string) => Promise<IpcResult<boolean>>;
+    unlockSessionWithPin: (pin: string) => Promise<IpcResult<boolean>>;
   };
   users: {
     getAll: () => Promise<IpcResult<User[]>>;
     create: (data: {
       fullName: string;
       username: string;
-      password: string;
+      password?: string;
+      pin?: string;
       roleId: number;
     }) => Promise<IpcResult<User>>;
     update: (id: number, data: {
@@ -68,6 +72,7 @@ export interface ElectronAPI {
     }) => Promise<IpcResult<User>>;
     setStatus: (id: number, status: 'active' | 'inactive') => Promise<IpcResult<boolean>>;
     resetPassword: (id: number, newPassword: string) => Promise<IpcResult<boolean>>;
+    resetPin: (id: number, newPin: string) => Promise<IpcResult<boolean>>;
   };
   roles: {
     getAll: () => Promise<IpcResult<Role[]>>;

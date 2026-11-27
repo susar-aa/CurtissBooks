@@ -72,6 +72,17 @@ export class CryptoService {
   }
 
   /**
+   * Validates 5-digit security PIN policy:
+   * - Exactly 5 numeric digits
+   */
+  public static validatePin(pin: string): { valid: boolean; message?: string } {
+    if (!pin || !/^\d{5}$/.test(pin.trim())) {
+      return { valid: false, message: 'PIN must be exactly 5 numeric digits (0-9).' };
+    }
+    return { valid: true };
+  }
+
+  /**
    * Generates a cryptographically random session token (64 hex characters).
    */
   public static generateSessionToken(): string {

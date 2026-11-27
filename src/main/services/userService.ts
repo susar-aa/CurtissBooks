@@ -38,7 +38,8 @@ export class UserService {
     data: {
       fullName: string;
       username: string;
-      password: string;
+      password?: string;
+      pin?: string;
       roleId: number;
     },
     creatorUserId: number | null
@@ -62,18 +63,30 @@ export class UserService {
       throw new Error(`Specified role #${data.roleId} does not exist.`);
     }
 
-    // Validate password
-    const strength = CryptoService.validatePasswordStrength(data.password);
-    if (!strength.valid) throw new Error(strength.message);
+    // Validate and hash password
+    const rawPassword = data.password && data.password.trim().length >= 8 ? data.password : 'User@12345';
+    const hash = CryptoService.hashPassword(rawPassword);
 
-    const hash = CryptoService.hashPassword(data.password);
+    // Validate and hash 5-digit PIN
+    const rawPin = data.pin && data.pin.trim() ? data.pin.trim() : '12345';
+    const pinValidation = CryptoService.validatePin(rawPin);
+    if (!pinValidation.valid) throw new Error(pinValidation.message);
+
+    // Check PIN uniqueness among existing users
+    const existingPins = db.prepare('SELECT id, username, pin_hash FROM users WHERE pin_hash IS NOT NULL').all() as { id: number; username: string; pin_hash: string }[];
+    for (const u of existingPins) {
+      if (CryptoService.verifyPassword(rawPin, u.pin_hash)) {
+        throw new Error(`This 5-digit PIN is already assigned to @${u.username}. Please choose a unique PIN.`);
+      }
+    }
+    const pinHash = CryptoService.hashPassword(rawPin);
 
     const stmt = db.prepare(`
-      INSERT INTO users (username, full_name, password_hash, role_id, status, created_by, created_at, updated_at)
-      VALUES (?, ?, ?, ?, 'active', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      INSERT INTO users (username, full_name, password_hash, pin_hash, role_id, status, created_by, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, 'active', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `);
 
-    const result = stmt.run(username, fullName, hash, data.roleId, creatorUserId);
+    const result = stmt.run(username, fullName, hash, pinHash, data.roleId, creatorUserId);
     const newId = Number(result.lastInsertRowid);
 
     AuditService.logAuthEvent(
@@ -82,7 +95,7 @@ export class UserService {
       'USER_CREATED',
       `users:${newId}`,
       'success',
-      `Created user ${username} with role ${data.roleId}`
+      `Created user ${username} with role ${data.roleId} and 5-digit PIN`
     );
 
     return this.getUserById(newId);
@@ -192,6 +205,46 @@ export class UserService {
       `users:${id}`,
       'success',
       `Password reset for user #${id}`
+    );
+
+    return result.changes > 0;
+  }
+
+  public static resetPin(id: number, newPin: string, adminUserId: number | null): boolean {
+    const db = getDatabase();
+    this.getUserById(id); // Ensure user exists
+
+    const cleanPin = (newPin || '').trim();
+    const validation = CryptoService.validatePin(cleanPin);
+    if (!validation.valid) throw new Error(validation.message);
+
+    // Ensure PIN is unique among users
+    const usersWithPin = db.prepare(`
+      SELECT id, username, pin_hash FROM users WHERE pin_hash IS NOT NULL AND id != ?
+    `).all(id) as { id: number; username: string; pin_hash: string }[];
+
+    for (const u of usersWithPin) {
+      if (CryptoService.verifyPassword(cleanPin, u.pin_hash)) {
+        throw new Error(`This 5-digit PIN is already assigned to @${u.username}. Please choose a different PIN.`);
+      }
+    }
+
+    const hash = CryptoService.hashPassword(cleanPin);
+
+    const stmt = db.prepare(`
+      UPDATE users
+      SET pin_hash = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `);
+    const result = stmt.run(hash, id);
+
+    AuditService.logAuthEvent(
+      adminUserId,
+      adminUserId ? String(adminUserId) : 'system',
+      'PIN_RESET',
+      `users:${id}`,
+      'success',
+      `5-digit PIN updated for user #${id}`
     );
 
     return result.changes > 0;

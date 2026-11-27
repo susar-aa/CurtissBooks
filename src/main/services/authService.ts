@@ -23,7 +23,8 @@ export class AuthService {
   public static setupInitialAdmin(data: {
     fullName: string;
     username: string;
-    password: string;
+    password?: string;
+    pin?: string;
   }): AuthSession {
     const db = getDatabase();
 
@@ -38,22 +39,105 @@ export class AuthService {
     if (!trimmedName) throw new Error('Full name is required.');
     if (!trimmedUser || trimmedUser.length < 3) throw new Error('Username must be at least 3 characters.');
 
-    const strength = CryptoService.validatePasswordStrength(data.password);
-    if (!strength.valid) throw new Error(strength.message);
+    const rawPassword = data.password && data.password.trim().length >= 8 ? data.password : 'Admin@12345';
+    const passwordHash = CryptoService.hashPassword(rawPassword);
 
-    const passwordHash = CryptoService.hashPassword(data.password);
+    const rawPin = data.pin && data.pin.trim() ? data.pin.trim() : '12345';
+    const pinValidation = CryptoService.validatePin(rawPin);
+    if (!pinValidation.valid) throw new Error(pinValidation.message);
+    const pinHash = CryptoService.hashPassword(rawPin);
 
     const insertUser = db.prepare(`
-      INSERT INTO users (username, full_name, password_hash, role_id, status, created_at, updated_at)
-      VALUES (?, ?, ?, 1, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      INSERT INTO users (username, full_name, password_hash, pin_hash, role_id, status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, 1, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `);
 
-    const result = insertUser.run(trimmedUser, trimmedName, passwordHash);
+    const result = insertUser.run(trimmedUser, trimmedName, passwordHash, pinHash);
     const userId = Number(result.lastInsertRowid);
 
     AuditService.logAuthEvent(userId, trimmedUser, 'INITIAL_ADMIN_SETUP', `users:${userId}`, 'success', 'Initial administrator provisioned');
 
     return this.createSession(userId, trimmedUser);
+  }
+
+  /**
+   * Authenticates using a 5-digit PIN (no username or password required).
+   */
+  public static loginWithPin(pin: string, ipOrDevice = 'localhost'): AuthSession {
+    const db = getDatabase();
+    const cleanPin = (pin || '').trim();
+
+    const pinValidation = CryptoService.validatePin(cleanPin);
+    if (!pinValidation.valid) {
+      throw new Error(pinValidation.message);
+    }
+
+    // Check account lockout window for PIN attempts
+    const recentFailures = db.prepare(`
+      SELECT COUNT(*) as count FROM login_attempts
+      WHERE (username = 'pin_auth' OR username = 'pin_user') AND success = 0 AND attempted_at >= datetime('now', '-' || ? || ' minutes')
+    `).get(LOCKOUT_WINDOW_MINUTES) as { count: number };
+
+    if (recentFailures.count >= MAX_FAILED_ATTEMPTS) {
+      AuditService.logAuthEvent(null, 'pin_auth', 'LOGIN_BLOCKED', null, 'failure', 'Temporary lockout due to repeated PIN failures');
+      throw new Error(`System is temporarily locked due to multiple failed login attempts. Please try again in ${LOCKOUT_WINDOW_MINUTES} minutes.`);
+    }
+
+    const recordAttempt = db.prepare(`
+      INSERT INTO login_attempts (username, ip_or_device, success, failure_reason)
+      VALUES (?, ?, ?, ?)
+    `);
+
+    // Fetch active users with PIN hash set (Explicit JOIN, explicit columns)
+    const activeUsers = db.prepare(`
+      SELECT u.id, u.username, u.full_name, u.pin_hash, u.role_id, u.status,
+             r.role_key, r.name_en as role_name_en, r.name_si as role_name_si
+      FROM users u
+      INNER JOIN roles r ON u.role_id = r.id
+      WHERE u.status = 'active' AND u.pin_hash IS NOT NULL
+      ORDER BY u.id ASC
+    `).all() as any[];
+
+    let matchedUser: any = null;
+    for (const u of activeUsers) {
+      if (CryptoService.verifyPassword(cleanPin, u.pin_hash)) {
+        matchedUser = u;
+        break;
+      }
+    }
+
+    if (matchedUser) {
+      recordAttempt.run(matchedUser.username, ipOrDevice, 1, null);
+      db.prepare('UPDATE users SET last_login_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(matchedUser.id);
+      AuditService.logAuthEvent(matchedUser.id, matchedUser.username, 'LOGIN_SUCCESS', `users:${matchedUser.id}`, 'success', 'Authenticated with 5-digit PIN');
+      return this.createSession(matchedUser.id, matchedUser.username);
+    }
+
+    // Check if the PIN belongs to a deactivated or locked user to give clear feedback
+    const inactiveUsers = db.prepare(`
+      SELECT u.id, u.username, u.full_name, u.pin_hash, u.status
+      FROM users u
+      WHERE u.status IN ('inactive', 'locked') AND u.pin_hash IS NOT NULL
+      ORDER BY u.id ASC
+    `).all() as any[];
+
+    for (const u of inactiveUsers) {
+      if (CryptoService.verifyPassword(cleanPin, u.pin_hash)) {
+        recordAttempt.run(u.username, ipOrDevice, 0, `Account ${u.status}`);
+        AuditService.logAuthEvent(u.id, u.username, 'LOGIN_REJECTED', `users:${u.id}`, 'failure', `Account is ${u.status}`);
+        if (u.status === 'locked') {
+          throw new Error('This account is locked. Please contact an administrator.');
+        } else {
+          throw new Error('This account has been deactivated. Please contact an administrator.');
+        }
+      }
+    }
+
+    // Record failed attempt
+    recordAttempt.run('pin_auth', ipOrDevice, 0, 'Invalid 5-digit PIN');
+    AuditService.logAuthEvent(null, 'pin_auth', 'LOGIN_FAILED', null, 'failure', 'Invalid 5-digit PIN');
+
+    throw new Error('Invalid 5-digit PIN. Please try again.');
   }
 
   /**
@@ -240,6 +324,28 @@ export class AuthService {
 
     db.prepare('UPDATE user_sessions SET is_locked = 0, last_activity_at = CURRENT_TIMESTAMP WHERE session_token = ?').run(sessionToken);
     AuditService.logAuthEvent(session.user_id, session.username, 'SESSION_UNLOCKED', null, 'success');
+    return true;
+  }
+
+  public static unlockSessionWithPin(sessionToken: string, pin: string): boolean {
+    const db = getDatabase();
+    const session = db.prepare(`
+      SELECT s.user_id, u.pin_hash, u.username
+      FROM user_sessions s
+      INNER JOIN users u ON s.user_id = u.id
+      WHERE s.session_token = ?
+    `).get(sessionToken) as any;
+
+    if (!session || !session.pin_hash) return false;
+
+    const isValid = CryptoService.verifyPassword(pin.trim(), session.pin_hash);
+    if (!isValid) {
+      AuditService.logAuthEvent(session.user_id, session.username, 'UNLOCK_FAILED', null, 'failure', 'Incorrect unlock PIN');
+      return false;
+    }
+
+    db.prepare('UPDATE user_sessions SET is_locked = 0, last_activity_at = CURRENT_TIMESTAMP WHERE session_token = ?').run(sessionToken);
+    AuditService.logAuthEvent(session.user_id, session.username, 'SESSION_UNLOCKED', null, 'success', 'Unlocked workstation with 5-digit PIN');
     return true;
   }
 

@@ -17,10 +17,12 @@ export const IPC_CHANNELS = {
   AUTH_CHECK_SETUP: 'auth:checkSetup',
   AUTH_SETUP_INITIAL_ADMIN: 'auth:setupInitialAdmin',
   AUTH_LOGIN: 'auth:login',
+  AUTH_LOGIN_PIN: 'auth:loginPin',
   AUTH_LOGOUT: 'auth:logout',
   AUTH_GET_CURRENT_SESSION: 'auth:getCurrentSession',
   AUTH_LOCK_SESSION: 'auth:lockSession',
   AUTH_UNLOCK_SESSION: 'auth:unlockSession',
+  AUTH_UNLOCK_SESSION_PIN: 'auth:unlockSessionPin',
 
   // User Management
   USERS_GET_ALL: 'users:getAll',
@@ -29,6 +31,7 @@ export const IPC_CHANNELS = {
   USERS_UPDATE: 'users:update',
   USERS_SET_STATUS: 'users:setStatus',
   USERS_RESET_PASSWORD: 'users:resetPassword',
+  USERS_RESET_PIN: 'users:resetPin',
 
   // Roles & Permissions
   ROLES_GET_ALL: 'roles:getAll',

@@ -50,12 +50,15 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [resetPinModalOpen, setResetPinModalOpen] = useState(false);
   const [confirmStatusModalOpen, setConfirmStatusModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   // Form Fields
   const [formFullName, setFormFullName] = useState('');
   const [formUsername, setFormUsername] = useState('');
+  const [formPin, setFormPin] = useState('');
+  const [formConfirmPin, setFormConfirmPin] = useState('');
   const [formPassword, setFormPassword] = useState('');
   const [formConfirmPassword, setFormConfirmPassword] = useState('');
   const [formRoleId, setFormRoleId] = useState<number>(5); // default clerk
@@ -113,13 +116,14 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
     e.preventDefault();
     setFormError(null);
 
-    if (!formFullName.trim() || !formUsername.trim() || !formPassword || !formConfirmPassword) {
-      setFormError('All fields are required.');
+    if (!formFullName.trim() || !formUsername.trim()) {
+      setFormError('Full name and username are required.');
       return;
     }
 
-    if (formPassword !== formConfirmPassword) {
-      setFormError('Passwords do not match.');
+    const pinToUse = formPin.trim() || '12345';
+    if (!/^\d{5}$/.test(pinToUse)) {
+      setFormError('PIN must be exactly 5 numeric digits.');
       return;
     }
 
@@ -127,20 +131,60 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
       const res = await window.curtissApi.users.create({
         fullName: formFullName.trim(),
         username: formUsername.trim(),
-        password: formPassword,
+        pin: pinToUse,
+        password: formPassword || 'Staff@12345',
         roleId: formRoleId,
       });
 
       if (res.success && res.data) {
-        success('Staff user created', `User @${res.data.username} registered.`);
+        success('Staff user created', `User @${res.data.username} registered with 5-digit PIN.`);
         setCreateModalOpen(false);
         setFormFullName('');
         setFormUsername('');
         setFormPassword('');
         setFormConfirmPassword('');
+        setFormPin('');
+        setFormConfirmPin('');
         loadAllData();
       } else {
         setFormError(res.error || 'Failed to create user.');
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setFormError(msg);
+    }
+  };
+
+  // Reset 5-Digit PIN Handler
+  const handleResetPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUser) return;
+    setFormError(null);
+
+    if (!formPin.trim() || !formConfirmPin.trim()) {
+      setFormError('PIN fields are required.');
+      return;
+    }
+
+    if (!/^\d{5}$/.test(formPin.trim())) {
+      setFormError('PIN must be exactly 5 numeric digits.');
+      return;
+    }
+
+    if (formPin.trim() !== formConfirmPin.trim()) {
+      setFormError('PINs do not match.');
+      return;
+    }
+
+    try {
+      const res = await window.curtissApi.users.resetPin(selectedUser.id, formPin.trim());
+      if (res.success) {
+        success('PIN updated', `5-digit PIN updated for @${selectedUser.username}.`);
+        setResetPinModalOpen(false);
+        setFormPin('');
+        setFormConfirmPin('');
+      } else {
+        setFormError(res.error || 'Failed to reset PIN.');
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -346,6 +390,21 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
             title={t('actions.editUser')}
           >
             <Edit2 className="w-3.5 h-3.5" />
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSelectedUser(u);
+              setFormPin('');
+              setFormConfirmPin('');
+              setFormError(null);
+              setResetPinModalOpen(true);
+            }}
+            title={t('actions.resetPin')}
+          >
+            <Shield className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300" />
           </Button>
 
           <Button
@@ -702,6 +761,16 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
           />
 
           <Input
+            id="create-pin"
+            type="text"
+            maxLength={5}
+            label={t('modals.pin')}
+            placeholder="e.g., 12345 (Default)"
+            value={formPin}
+            onChange={(e) => setFormPin(e.target.value.replace(/\D/g, '').slice(0, 5))}
+          />
+
+          <Input
             id="create-password"
             type="password"
             label={t('modals.password')}
@@ -832,6 +901,64 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
               variant="outline"
               size="sm"
               onClick={() => setResetModalOpen(false)}
+            >
+              {tCommon('actions.cancel')}
+            </Button>
+            <Button type="submit" size="sm">
+              {tCommon('actions.save')}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal: Reset 5-Digit PIN */}
+      <Modal
+        isOpen={resetPinModalOpen}
+        onClose={() => setResetPinModalOpen(false)}
+        title={t('modals.resetPinTitle')}
+        maxWidth="sm"
+      >
+        <form onSubmit={handleResetPin} className="space-y-3">
+          {formError && (
+            <div className="p-2.5 text-xs bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900 rounded-md text-red-600 dark:text-red-400 flex items-center space-x-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{formError}</span>
+            </div>
+          )}
+
+          <div className="text-xs text-zinc-500 font-mono">
+            Target User: @{selectedUser?.username} ({selectedUser?.full_name})
+          </div>
+
+          <Input
+            id="reset-pin"
+            type="text"
+            maxLength={5}
+            label={t('modals.newPin')}
+            placeholder="e.g. 54321"
+            value={formPin}
+            onChange={(e) => setFormPin(e.target.value.replace(/\D/g, '').slice(0, 5))}
+            required
+            autoFocus
+          />
+
+          <Input
+            id="reset-confirm-pin"
+            type="text"
+            maxLength={5}
+            label={t('modals.confirmNewPin')}
+            placeholder="e.g. 54321"
+            value={formConfirmPin}
+            onChange={(e) => setFormConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 5))}
+            required
+          />
+
+          <div className="flex justify-end space-x-2 pt-3 border-t border-zinc-100 dark:border-zinc-900">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setResetPinModalOpen(false)}
             >
               {tCommon('actions.cancel')}
             </Button>

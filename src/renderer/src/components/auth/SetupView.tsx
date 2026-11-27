@@ -21,6 +21,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
 
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('admin');
+  const [pin, setPin] = useState('12345');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -30,8 +31,13 @@ export const SetupView: React.FC<SetupViewProps> = ({
     e.preventDefault();
     setError(null);
 
-    if (!fullName.trim() || !username.trim() || !password || !confirmPassword) {
+    if (!fullName.trim() || !username.trim() || !password || !confirmPassword || !pin.trim()) {
       setError(t('setup.errors.allFieldsRequired'));
+      return;
+    }
+
+    if (!/^\d{5}$/.test(pin.trim())) {
+      setError(t('setup.errors.invalidPin'));
       return;
     }
 
@@ -45,6 +51,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
       const res = await window.curtissApi.auth.setupInitialAdmin({
         fullName: fullName.trim(),
         username: username.trim(),
+        pin: pin.trim(),
         password,
       });
 
@@ -141,6 +148,17 @@ export const SetupView: React.FC<SetupViewProps> = ({
             placeholder={t('setup.usernamePlaceholder')}
             value={username}
             onChange={(e) => setUsername(e.target.value)}
+            disabled={isLoading}
+          />
+
+          <Input
+            id="setup-pin"
+            type="text"
+            maxLength={5}
+            label={t('setup.pin')}
+            placeholder={t('setup.pinPlaceholder')}
+            value={pin}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 5))}
             disabled={isLoading}
           />
 

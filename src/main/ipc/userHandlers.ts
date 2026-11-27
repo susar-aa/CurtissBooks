@@ -60,5 +60,16 @@ export function registerUserHandlers(): void {
       return { success: false, error };
     }
   });
+
+  ipcMain.handle(IPC_CHANNELS.USERS_RESET_PIN, async (_event, id: number, newPin: string): Promise<IpcResult<boolean>> => {
+    try {
+      const session = assertAuthorized('users.reset_password');
+      const ok = UserService.resetPin(id, newPin, session.user.id);
+      return { success: true, data: ok };
+    } catch (err: unknown) {
+      const error = err instanceof Error ? err.message : String(err);
+      return { success: false, error };
+    }
+  });
 }
 

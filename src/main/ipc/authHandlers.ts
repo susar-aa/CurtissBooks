@@ -47,6 +47,17 @@ export function registerAuthHandlers(): void {
     }
   });
 
+  ipcMain.handle(IPC_CHANNELS.AUTH_LOGIN_PIN, async (_event, pin: string): Promise<IpcResult<AuthSession>> => {
+    try {
+      const session = AuthService.loginWithPin(pin);
+      currentSessionToken = session.sessionToken;
+      return { success: true, data: session };
+    } catch (err: unknown) {
+      const error = err instanceof Error ? err.message : String(err);
+      return { success: false, error };
+    }
+  });
+
   ipcMain.handle(IPC_CHANNELS.AUTH_LOGOUT, async (): Promise<IpcResult<boolean>> => {
     try {
       if (currentSessionToken) {
@@ -94,6 +105,20 @@ export function registerAuthHandlers(): void {
       const ok = AuthService.unlockSession(currentSessionToken, password);
       if (!ok) {
         return { success: false, error: 'Incorrect password.' };
+      }
+      return { success: true, data: true };
+    } catch (err: unknown) {
+      const error = err instanceof Error ? err.message : String(err);
+      return { success: false, error };
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.AUTH_UNLOCK_SESSION_PIN, async (_event, pin: string): Promise<IpcResult<boolean>> => {
+    try {
+      if (!currentSessionToken) throw new Error('No active session.');
+      const ok = AuthService.unlockSessionWithPin(currentSessionToken, pin);
+      if (!ok) {
+        return { success: false, error: 'Incorrect 5-digit PIN.' };
       }
       return { success: true, data: true };
     } catch (err: unknown) {

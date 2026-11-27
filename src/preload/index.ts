@@ -40,6 +40,8 @@ const api: ElectronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.AUTH_SETUP_INITIAL_ADMIN, data),
     login: (credentials): Promise<IpcResult<AuthSession>> =>
       ipcRenderer.invoke(IPC_CHANNELS.AUTH_LOGIN, credentials),
+    loginWithPin: (pin: string): Promise<IpcResult<AuthSession>> =>
+      ipcRenderer.invoke(IPC_CHANNELS.AUTH_LOGIN_PIN, pin),
     logout: (): Promise<IpcResult<boolean>> =>
       ipcRenderer.invoke(IPC_CHANNELS.AUTH_LOGOUT),
     getCurrentSession: (): Promise<IpcResult<AuthSession | null>> =>
@@ -48,6 +50,8 @@ const api: ElectronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.AUTH_LOCK_SESSION),
     unlockSession: (password: string): Promise<IpcResult<boolean>> =>
       ipcRenderer.invoke(IPC_CHANNELS.AUTH_UNLOCK_SESSION, password),
+    unlockSessionWithPin: (pin: string): Promise<IpcResult<boolean>> =>
+      ipcRenderer.invoke(IPC_CHANNELS.AUTH_UNLOCK_SESSION_PIN, pin),
   },
   users: {
     getAll: (): Promise<IpcResult<User[]>> =>
@@ -60,6 +64,8 @@ const api: ElectronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.USERS_SET_STATUS, id, status),
     resetPassword: (id: number, newPassword: string): Promise<IpcResult<boolean>> =>
       ipcRenderer.invoke(IPC_CHANNELS.USERS_RESET_PASSWORD, id, newPassword),
+    resetPin: (id: number, newPin: string): Promise<IpcResult<boolean>> =>
+      ipcRenderer.invoke(IPC_CHANNELS.USERS_RESET_PIN, id, newPin),
   },
   roles: {
     getAll: (): Promise<IpcResult<Role[]>> =>
