@@ -60,6 +60,8 @@ export const BudgetManagementView: React.FC = () => {
   const [selectedCatForTx, setSelectedCatForTx] = useState<BudgetAllocationItem | null>(null);
   const [categoryTransactions, setCategoryTransactions] = useState<Expense[]>([]);
   const [txSearchQuery, setTxSearchQuery] = useState('');
+  const [txPaymentMethodFilter, setTxPaymentMethodFilter] = useState<string>('all');
+  const [txStatusFilter, setTxStatusFilter] = useState<string>('all');
   const [txLoading, setTxLoading] = useState(false);
 
   // Budget Reallocation State
@@ -111,10 +113,12 @@ export const BudgetManagementView: React.FC = () => {
   const handleOpenCategoryTransactions = async (category: BudgetAllocationItem) => {
     setSelectedCatForTx(category);
     setTxSearchQuery('');
+    setTxPaymentMethodFilter('all');
+    setTxStatusFilter('all');
     setTxLoading(true);
     try {
       if (window.curtissApi?.financial?.getExpenses && yearDetail) {
-        const res = await window.curtissApi.financial.getExpenses(100, 0, yearDetail.id, category.category_id);
+        const res = await window.curtissApi.financial.getExpenses(500, 0, yearDetail.id, category.category_id);
         if (res.success && res.data) {
           setCategoryTransactions(res.data.expenses || []);
         } else {
@@ -316,15 +320,41 @@ export const BudgetManagementView: React.FC = () => {
 
   // Filter transactions within modal
   const filteredModalTransactions = useMemo(() => {
-    if (!txSearchQuery.trim()) return categoryTransactions;
-    const q = txSearchQuery.toLowerCase().trim();
-    return categoryTransactions.filter((tx) =>
-      (tx.voucher_no && tx.voucher_no.toLowerCase().includes(q)) ||
-      (tx.payee && tx.payee.toLowerCase().includes(q)) ||
-      (tx.description && tx.description.toLowerCase().includes(q)) ||
-      (tx.reference_no && tx.reference_no.toLowerCase().includes(q))
-    );
-  }, [categoryTransactions, txSearchQuery]);
+    let list = categoryTransactions;
+    if (txPaymentMethodFilter !== 'all') {
+      list = list.filter((tx) => {
+        if (txPaymentMethodFilter === 'cheque') {
+          return tx.payment_method === 'cheque' || (tx as any).cheque_number;
+        }
+        return tx.payment_method === txPaymentMethodFilter;
+      });
+    }
+    if (txStatusFilter !== 'all') {
+      list = list.filter((tx) => tx.status === txStatusFilter);
+    }
+    if (txSearchQuery.trim()) {
+      const q = txSearchQuery.toLowerCase().trim();
+      list = list.filter((tx) =>
+        (tx.voucher_no && tx.voucher_no.toLowerCase().includes(q)) ||
+        (tx.payee && tx.payee.toLowerCase().includes(q)) ||
+        (tx.description && tx.description.toLowerCase().includes(q)) ||
+        (tx.reference_no && tx.reference_no.toLowerCase().includes(q)) ||
+        (tx.bill_no && tx.bill_no.toLowerCase().includes(q)) ||
+        ((tx as any).bank_name && (tx as any).bank_name.toLowerCase().includes(q)) ||
+        ((tx as any).cheque_number && (tx as any).cheque_number.toLowerCase().includes(q))
+      );
+    }
+    return list;
+  }, [categoryTransactions, txSearchQuery, txPaymentMethodFilter, txStatusFilter]);
+
+  const filteredTotalSpentCents = useMemo(() => {
+    return filteredModalTransactions.reduce((acc, tx) => {
+      if (tx.status !== 'reversed') {
+        return acc + (tx.amount_cents || 0);
+      }
+      return acc;
+    }, 0);
+  }, [filteredModalTransactions]);
 
   // Open Reallocation Modal
   const handleOpenReallocateModal = () => {
@@ -1196,143 +1226,325 @@ export const BudgetManagementView: React.FC = () => {
       </Modal>
 
       {/* Category Transactions Modal */}
-      {selectedCatForTx && (
-        <Modal
-          isOpen={Boolean(selectedCatForTx)}
-          onClose={() => setSelectedCatForTx(null)}
-          title={`Category Ledger: ${selectedCatForTx.category_code ? `[${selectedCatForTx.category_code}] ` : ''}${
-            i18n.language === 'si' && selectedCatForTx.category_name_si
-              ? selectedCatForTx.category_name_si
-              : selectedCatForTx.category_name
-          }`}
-          maxWidth="2xl"
-        >
-          <div className="space-y-4">
-            {/* Category KPI Mini-Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 text-xs">
-              <div>
-                <span className="text-zinc-400 font-medium block text-[10px] uppercase tracking-wider">Allocated</span>
-                <span className="text-sm font-bold font-mono text-zinc-900 dark:text-zinc-100">
-                  Rs. {(selectedCatForTx.allocated_amount_cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
+      {selectedCatForTx && (() => {
+        const allocated = selectedCatForTx.allocated_amount_cents || 0;
+        const spent = selectedCatForTx.spent_amount_cents || 0;
+        const remaining = selectedCatForTx.remaining_amount_cents ?? (allocated - spent);
+        const burnRate = allocated > 0 ? Math.min(100, Math.round((spent / allocated) * 100)) : 0;
 
-              <div>
-                <span className="text-zinc-400 font-medium block text-[10px] uppercase tracking-wider">Spent</span>
-                <span className="text-sm font-bold font-mono text-amber-600 dark:text-amber-400">
-                  Rs. {((selectedCatForTx.spent_amount_cents || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-
-              <div>
-                <span className="text-zinc-400 font-medium block text-[10px] uppercase tracking-wider">Remaining</span>
-                <span
-                  className={`text-sm font-bold font-mono ${
-                    (selectedCatForTx.remaining_amount_cents ?? 0) < 0
-                      ? 'text-red-600 dark:text-red-400'
-                      : 'text-emerald-600 dark:text-emerald-400'
-                  }`}
-                >
-                  Rs. {(
-                    ((selectedCatForTx.remaining_amount_cents ??
-                      selectedCatForTx.allocated_amount_cents -
-                        (selectedCatForTx.spent_amount_cents || 0))) /
-                    100
-                  ).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-
-              <div>
-                <span className="text-zinc-400 font-medium block text-[10px] uppercase tracking-wider">Vouchers</span>
-                <span className="text-sm font-bold font-mono text-zinc-700 dark:text-zinc-300">
-                  {categoryTransactions.length} Posted
-                </span>
-              </div>
-            </div>
-
-            {/* Modal Vouchers Search */}
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-zinc-400" />
-              <input
-                type="text"
-                placeholder="Search vouchers..."
-                value={txSearchQuery}
-                onChange={(e) => setTxSearchQuery(e.target.value)}
-                className="h-8 pl-8 pr-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100 w-full"
-              />
-            </div>
-
-            {/* Transactions List */}
-            <div className="border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
-              {txLoading ? (
-                <div className="p-8 text-center text-xs text-zinc-400 space-y-2">
-                  <RefreshCw className="w-5 h-5 animate-spin mx-auto text-zinc-400" />
-                  <div>Loading transactions...</div>
+        return (
+          <Modal
+            isOpen={Boolean(selectedCatForTx)}
+            onClose={() => setSelectedCatForTx(null)}
+            fullscreen={true}
+            title={
+              <div className="flex items-center space-x-3">
+                <div className="p-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+                  <Receipt className="w-5 h-5" />
                 </div>
-              ) : filteredModalTransactions.length === 0 ? (
-                <div className="p-8 text-center text-xs text-zinc-400 space-y-1">
-                  <Receipt className="w-6 h-6 mx-auto text-zinc-300 dark:text-zinc-600" />
-                  <div className="font-semibold text-zinc-700 dark:text-zinc-300">
-                    {categoryTransactions.length === 0
-                      ? t('budget.noTransactions', 'No transactions posted yet under this budget category.')
-                      : `No transactions match "${txSearchQuery}".`}
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                      Category Transaction Ledger
+                    </span>
+                    {selectedCatForTx.category_code && (
+                      <span className="font-mono px-2 py-0.5 rounded-md bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 text-xs font-bold">
+                        {selectedCatForTx.category_code}
+                      </span>
+                    )}
+                    <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+                      {i18n.language === 'si' && selectedCatForTx.category_name_si
+                        ? selectedCatForTx.category_name_si
+                        : selectedCatForTx.category_name}
+                    </span>
+                    {selectedCatForTx.category_name_si &&
+                      selectedCatForTx.category_name &&
+                      selectedCatForTx.category_name_si !== selectedCatForTx.category_name && (
+                        <span className="text-xs text-zinc-400 font-sinhala font-normal">
+                          ({i18n.language === 'si' ? selectedCatForTx.category_name : selectedCatForTx.category_name_si})
+                        </span>
+                      )}
+                  </div>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 flex items-center space-x-2">
+                    <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                      {yearDetail?.year_name || 'Running Financial Period'}
+                    </span>
+                    <span>•</span>
+                    <span>Disbursement vouchers & expenditure transactions posted under this category</span>
+                  </p>
+                </div>
+              </div>
+            }
+            headerAction={
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedCatForTx(null)}
+                className="h-8 px-3 text-xs gap-1.5 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              >
+                <X className="w-3.5 h-3.5 text-zinc-500" />
+                <span>Close (Esc)</span>
+              </Button>
+            }
+          >
+            <div className="space-y-3.5 flex flex-col h-full">
+              {/* Category KPI Mini-Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 flex-shrink-0">
+                <div className="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/50 flex flex-col justify-between">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Allocated Budget</span>
+                  <div className="mt-1">
+                    <span className="text-base sm:text-lg font-bold font-mono text-zinc-900 dark:text-zinc-100">
+                      Rs. {(allocated / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </span>
+                    <span className="text-[10px] text-zinc-400 block mt-0.5">Approved annual ceiling</span>
                   </div>
                 </div>
-              ) : (
-                <div className="overflow-x-auto max-h-80">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-zinc-50 dark:bg-zinc-900/50 text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 sticky top-0">
-                      <tr>
-                        <th className="py-2.5 px-3 font-semibold">{t('budget.transVoucher', 'Voucher')}</th>
-                        <th className="py-2.5 px-3 font-semibold">{t('budget.transDate', 'Date')}</th>
-                        <th className="py-2.5 px-3 font-semibold">{t('budget.transPayee', 'Payee / Description')}</th>
-                        <th className="py-2.5 px-3 font-semibold">{t('budget.transMethod', 'Method')}</th>
-                        <th className="py-2.5 px-3 font-semibold text-right">{t('budget.transAmount', 'Amount (Rs.)')}</th>
-                        <th className="py-2.5 px-3 font-semibold text-center">{tCommon('labels.status', 'Status')}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                      {filteredModalTransactions.map((tx) => (
-                        <tr key={tx.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30">
-                          <td className="py-2.5 px-3 font-mono font-semibold text-zinc-900 dark:text-zinc-100">
-                            {tx.voucher_no}
-                          </td>
-                          <td className="py-2.5 px-3 font-mono text-zinc-500">{tx.expense_date}</td>
-                          <td className="py-2.5 px-3">
-                            <div className="font-medium text-zinc-900 dark:text-zinc-100">{tx.payee}</div>
-                            <div className="text-[10px] text-zinc-400 truncate max-w-xs">{tx.description}</div>
-                          </td>
-                          <td className="py-2.5 px-3">
-                            <span className="capitalize font-mono text-[11px] text-zinc-600 dark:text-zinc-400">
-                              {tx.payment_method === 'bank' && (tx as any).bank_name
-                                ? `Bank (${(tx as any).bank_name})`
-                                : tCommon(`paymentMethods.${tx.payment_method}`, tx.payment_method.replace('_', ' '))}
-                            </span>
-                          </td>
-                          <td className="py-2.5 px-3 text-right font-mono font-semibold text-amber-600 dark:text-amber-400">
-                            Rs. {(tx.amount_cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                          </td>
-                          <td className="py-2.5 px-3 text-center">
-                            <Badge variant={tx.status === 'approved' ? 'success' : 'neutral'} size="sm">
-                              {tCommon(`status.${tx.status}`, tx.status.toUpperCase())}
-                            </Badge>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
 
-            <div className="flex justify-end pt-2">
-              <Button variant="outline" size="sm" onClick={() => setSelectedCatForTx(null)}>
-                {tCommon('actions.close', 'Close')}
-              </Button>
+                <div className="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/50 flex flex-col justify-between">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Total Disbursed</span>
+                  <div className="mt-1">
+                    <span className="text-base sm:text-lg font-bold font-mono text-amber-600 dark:text-amber-400">
+                      Rs. {(spent / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </span>
+                    <span className="text-[10px] text-zinc-400 block mt-0.5">
+                      {categoryTransactions.length} total vouchers posted
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/50 flex flex-col justify-between">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Remaining Balance</span>
+                  <div className="mt-1">
+                    <span
+                      className={`text-base sm:text-lg font-bold font-mono ${
+                        remaining < 0
+                          ? 'text-red-600 dark:text-red-400'
+                          : 'text-emerald-600 dark:text-emerald-400'
+                      }`}
+                    >
+                      Rs. {(remaining / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </span>
+                    <span className="text-[10px] text-zinc-400 block mt-0.5">
+                      {remaining < 0 ? 'Budget ceiling exceeded' : 'Available spending headroom'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/50 flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Budget Utilization</span>
+                    <span className="text-xs font-mono font-bold text-zinc-700 dark:text-zinc-300">{burnRate}%</span>
+                  </div>
+                  <div className="mt-1.5 space-y-1">
+                    <div className="w-full h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-300 ${
+                          burnRate >= 100 ? 'bg-red-500' : burnRate >= 80 ? 'bg-amber-500' : 'bg-emerald-500'
+                        }`}
+                        style={{ width: `${Math.min(100, burnRate)}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-zinc-400 block">
+                      {burnRate >= 100 ? 'Ceiling reached' : `${(100 - burnRate).toFixed(1)}% remaining`}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Vouchers Search & Filters Toolbar */}
+              <div className="flex flex-wrap items-center gap-2 bg-zinc-50/80 dark:bg-zinc-900/40 p-2 rounded-xl border border-zinc-200 dark:border-zinc-800 flex-shrink-0">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                  <input
+                    type="text"
+                    placeholder="Search voucher #, payee, description, bill #, cheque #..."
+                    value={txSearchQuery}
+                    onChange={(e) => setTxSearchQuery(e.target.value)}
+                    className="h-8 pl-8 pr-7 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100 w-full"
+                  />
+                  {txSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setTxSearchQuery('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="w-36">
+                  <select
+                    value={txPaymentMethodFilter}
+                    onChange={(e) => setTxPaymentMethodFilter(e.target.value)}
+                    className="h-8 px-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100 w-full"
+                  >
+                    <option value="all">All Methods</option>
+                    <option value="cash">Cash in Hand</option>
+                    <option value="bank">Bank Transfer</option>
+                    <option value="petty_cash">Petty Cash</option>
+                    <option value="cheque">Cheque</option>
+                  </select>
+                </div>
+
+                <div className="w-32">
+                  <select
+                    value={txStatusFilter}
+                    onChange={(e) => setTxStatusFilter(e.target.value)}
+                    className="h-8 px-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100 w-full"
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="approved">Approved</option>
+                    <option value="paid">Paid</option>
+                    <option value="draft">Draft</option>
+                    <option value="reversed">Reversed</option>
+                  </select>
+                </div>
+
+                {(txSearchQuery || txPaymentMethodFilter !== 'all' || txStatusFilter !== 'all') && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setTxSearchQuery('');
+                      setTxPaymentMethodFilter('all');
+                      setTxStatusFilter('all');
+                    }}
+                    className="h-8 text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 px-2.5"
+                  >
+                    <X className="w-3 h-3 mr-1" />
+                    Clear
+                  </Button>
+                )}
+
+                <div className="ml-auto text-xs text-zinc-500 font-medium">
+                  Showing <span className="font-semibold text-zinc-900 dark:text-zinc-100">{filteredModalTransactions.length}</span> of {categoryTransactions.length} vouchers
+                </div>
+              </div>
+
+              {/* Transactions List with Zebra Strips */}
+              <div className="flex-1 min-h-[300px] border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden flex flex-col bg-white dark:bg-zinc-900/60 shadow-xs">
+                {txLoading ? (
+                  <div className="p-12 text-center text-xs text-zinc-400 space-y-2 my-auto">
+                    <RefreshCw className="w-6 h-6 animate-spin mx-auto text-zinc-400" />
+                    <div>Loading category transaction ledger...</div>
+                  </div>
+                ) : filteredModalTransactions.length === 0 ? (
+                  <div className="p-12 text-center text-xs text-zinc-400 space-y-2 my-auto">
+                    <Receipt className="w-8 h-8 mx-auto text-zinc-300 dark:text-zinc-600" />
+                    <div className="font-semibold text-zinc-700 dark:text-zinc-300 text-sm">
+                      {categoryTransactions.length === 0
+                        ? t('budget.noTransactions', 'No transactions posted yet under this budget category.')
+                        : `No transactions match your search and filter criteria.`}
+                    </div>
+                    {categoryTransactions.length > 0 && (
+                      <button
+                        onClick={() => {
+                          setTxSearchQuery('');
+                          setTxPaymentMethodFilter('all');
+                          setTxStatusFilter('all');
+                        }}
+                        className="text-xs text-blue-600 hover:underline"
+                      >
+                        Reset filters
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="overflow-auto flex-1">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-zinc-100/90 dark:bg-zinc-800/90 backdrop-blur-xs text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10">
+                        <tr>
+                          <th className="py-2.5 px-3 font-semibold text-center w-12">#</th>
+                          <th className="py-2.5 px-3 font-semibold w-32">{t('budget.transVoucher', 'Voucher')}</th>
+                          <th className="py-2.5 px-3 font-semibold w-28">{t('budget.transDate', 'Date')}</th>
+                          <th className="py-2.5 px-3 font-semibold">{t('budget.transPayee', 'Payee / Description')}</th>
+                          <th className="py-2.5 px-3 font-semibold w-36">{t('budget.transMethod', 'Payment Method')}</th>
+                          <th className="py-2.5 px-3 font-semibold w-32">Bill / Ref #</th>
+                          <th className="py-2.5 px-3 font-semibold text-right w-36">{t('budget.transAmount', 'Amount (Rs.)')}</th>
+                          <th className="py-2.5 px-3 font-semibold text-center w-28">{tCommon('labels.status', 'Status')}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60">
+                        {filteredModalTransactions.map((tx, idx) => (
+                          <tr
+                            key={tx.id}
+                            className="even:bg-white dark:even:bg-zinc-900 odd:bg-zinc-50/70 dark:odd:bg-zinc-800/25 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/50 transition-colors"
+                          >
+                            <td className="py-2.5 px-3 text-center text-zinc-400 font-mono text-[11px]">
+                              {idx + 1}
+                            </td>
+                            <td className="py-2.5 px-3 font-mono font-bold text-zinc-900 dark:text-zinc-100">
+                              {tx.voucher_no}
+                            </td>
+                            <td className="py-2.5 px-3 font-mono text-zinc-500">{tx.expense_date}</td>
+                            <td className="py-2.5 px-3">
+                              <div className="font-medium text-zinc-900 dark:text-zinc-100">{tx.payee}</div>
+                              {tx.description && (
+                                <div className="text-[11px] text-zinc-500 dark:text-zinc-400 line-clamp-1 mt-0.5">
+                                  {tx.description}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <span className="capitalize font-mono text-[11px] text-zinc-600 dark:text-zinc-400">
+                                {tx.payment_method === 'bank' && (tx as any).bank_name
+                                  ? `Bank (${(tx as any).bank_name})`
+                                  : tCommon(`paymentMethods.${tx.payment_method}`, tx.payment_method.replace('_', ' '))}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 font-mono text-[11px] text-zinc-500">
+                              {tx.bill_no || tx.reference_no || '—'}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-mono font-bold text-zinc-900 dark:text-zinc-100">
+                              Rs. {(tx.amount_cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              <Badge
+                                variant={
+                                  tx.status === 'approved' || tx.status === 'paid'
+                                    ? 'success'
+                                    : tx.status === 'reversed'
+                                    ? 'destructive'
+                                    : 'neutral'
+                                }
+                                size="sm"
+                              >
+                                {tCommon(`status.${tx.status}`, tx.status.toUpperCase())}
+                              </Badge>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom Summary Bar & Close Button */}
+              <div className="flex items-center justify-between pt-2 border-t border-zinc-200 dark:border-zinc-800 flex-shrink-0 text-xs">
+                <div className="flex items-center space-x-3 text-zinc-500">
+                  <span>
+                    Total Disbursed for Filtered Records:
+                    <span className="ml-1.5 font-mono font-bold text-zinc-900 dark:text-zinc-100 text-sm">
+                      Rs. {(filteredTotalSpentCents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </span>
+                  </span>
+                  <span>•</span>
+                  <span>{filteredModalTransactions.length} vouchers recorded</span>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Button variant="outline" size="sm" onClick={() => setSelectedCatForTx(null)} className="h-8 px-4 font-medium">
+                    <X className="w-3.5 h-3.5 mr-1" />
+                    {tCommon('actions.close', 'Close')}
+                  </Button>
+                </div>
+              </div>
             </div>
-          </div>
-        </Modal>
-      )}
+          </Modal>
+        );
+      })()}
     </div>
   );
 };
