@@ -145,6 +145,34 @@ const periodicStmt = FinancialService.getPeriodicStatementReport({
 assert(periodicStmt.opening_balance_cents >= newBankOpen + adjustedCashOpen, 'Periodic statement opening balance must include bank opening balance and cash opening balance');
 console.log(`✓ Periodic Statement opening balance: Rs. ${(periodicStmt.opening_balance_cents / 100).toFixed(2)}`);
 
+// Step 10: Verify Opening Balances when financial_years is completely empty
+console.log('\n[TEST 10] Testing updateOpeningBalances when financial_years is completely empty...');
+db.pragma('foreign_keys = OFF');
+db.prepare('DELETE FROM cash_transactions').run();
+db.prepare('DELETE FROM petty_cash_vouchers').run();
+db.prepare('DELETE FROM financial_years').run();
+db.pragma('foreign_keys = ON');
+
+assert.strictEqual(db.prepare('SELECT count(*) as c FROM financial_years').get().c, 0, 'financial_years must be empty before test');
+
+const emptyFYUpdate = SettingsService.updateOpeningBalances({
+  financialYearId: undefined,
+  cashOpeningBalanceCents: 5000000,
+  pettyCashOpeningBalanceCents: 2000000,
+  bankAccounts: [{ id: bankAcc.id, opening_balance_cents: 10000000 }],
+}, admin.user.id);
+
+assert.strictEqual(emptyFYUpdate, true, 'updateOpeningBalances must return true even when financial_years starts empty');
+const createdFY = db.prepare('SELECT id, year_name, is_current FROM financial_years WHERE is_current = 1').get();
+assert(createdFY, 'Default active financial year must be auto-created');
+assert.strictEqual(createdFY.is_current, 1, 'Auto-created financial year must be active/current');
+
+const emptyFYData = SettingsService.getOpeningBalances();
+assert(emptyFYData.financialYear, 'Financial Year must be returned');
+assert.strictEqual(emptyFYData.cashOpeningBalanceCents, 5000000, 'Cash opening balance must be 50,000.00');
+assert.strictEqual(emptyFYData.pettyCashOpeningBalanceCents, 2000000, 'Petty cash opening balance must be 20,000.00');
+console.log('✓ Opening balances gracefully handled and default active financial year created without FOREIGN KEY error.');
+
 console.log('\n================================================================');
-console.log('>>> ALL 9 OPENING BALANCES TESTS PASSED CLEANLY! <<<');
+console.log('>>> ALL 10 OPENING BALANCES TESTS PASSED CLEANLY! <<<');
 console.log('================================================================\n');

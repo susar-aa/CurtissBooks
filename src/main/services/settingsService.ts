@@ -1,3 +1,4 @@
+import Database from 'better-sqlite3';
 import { getDatabase } from '../db';
 import { CryptoService } from './cryptoService';
 import { AuditService } from './auditService';
@@ -166,12 +167,17 @@ export class SettingsService {
   }
 
   /**
-   * Retrieves opening balances for Cash in Hand, Bank Accounts, and Petty Cash Float.
+   * Resolves the target financial year for opening balances.
+   * If none exists in the system (e.g. fresh install or after factory reset),
+   * automatically creates a default active financial year for the current calendar year.
    */
-  public static getOpeningBalances(financialYearId?: number): OpeningBalancesData {
-    const db = getDatabase();
-
-    // 1. Resolve Financial Year
+  public static resolveOrCreateFinancialYear(db: Database.Database, financialYearId?: number): {
+    id: number;
+    year_name: string;
+    start_date: string;
+    end_date: string;
+    is_current: boolean;
+  } {
     let fy: any = null;
     if (financialYearId) {
       fy = db.prepare(`
@@ -198,7 +204,45 @@ export class SettingsService {
       `).get();
     }
 
-    const yearId = fy ? fy.id : 1;
+    if (!fy) {
+      const curYear = new Date().getFullYear();
+      const yearName = `FY-${curYear}`;
+      const startDate = `${curYear}-01-01`;
+      const endDate = `${curYear}-12-31`;
+
+      const insertRes = db.prepare(`
+        INSERT INTO financial_years (
+          year_name, start_date, end_date, status, is_current, updated_at
+        ) VALUES (?, ?, ?, 'open', 1, CURRENT_TIMESTAMP)
+      `).run(yearName, startDate, endDate);
+
+      fy = {
+        id: Number(insertRes.lastInsertRowid),
+        year_name: yearName,
+        start_date: startDate,
+        end_date: endDate,
+        is_current: 1,
+      };
+    }
+
+    return {
+      id: fy.id,
+      year_name: fy.year_name,
+      start_date: fy.start_date,
+      end_date: fy.end_date,
+      is_current: Boolean(fy.is_current),
+    };
+  }
+
+  /**
+   * Retrieves opening balances for Cash in Hand, Bank Accounts, and Petty Cash Float.
+   */
+  public static getOpeningBalances(financialYearId?: number): OpeningBalancesData {
+    const db = getDatabase();
+
+    // 1. Resolve or Create Financial Year
+    const fy = this.resolveOrCreateFinancialYear(db, financialYearId);
+    const yearId = fy.id;
 
     // 2. Cash in Hand Opening & Current Balance
     const cashOpnRow = db.prepare(`
@@ -286,33 +330,21 @@ export class SettingsService {
   ): boolean {
     const db = getDatabase();
 
-    // 1. Resolve Financial Year
-    let fy: any = null;
-    if (data.financialYearId) {
-      fy = db.prepare(`
-        SELECT id, year_name, start_date, end_date
-        FROM financial_years
-        WHERE id = ?
-      `).get(data.financialYearId);
-    }
-    if (!fy) {
-      fy = db.prepare(`
-        SELECT id, year_name, start_date, end_date
-        FROM financial_years
-        WHERE is_current = 1
-        ORDER BY id DESC LIMIT 1
-      `).get();
-    }
-    if (!fy) {
-      fy = db.prepare(`
-        SELECT id, year_name, start_date, end_date
-        FROM financial_years
-        ORDER BY id DESC LIMIT 1
-      `).get();
-    }
+    // 1. Resolve or Create Financial Year
+    const fy = this.resolveOrCreateFinancialYear(db, data.financialYearId);
+    const yearId = fy.id;
+    const txDate = fy.start_date || new Date().toISOString().split('T')[0];
 
-    const yearId = fy ? fy.id : 1;
-    const txDate = fy ? fy.start_date : new Date().toISOString().split('T')[0];
+    // 2. Validate User ID against users table for foreign key safety
+    let validUserId: number | null = null;
+    if (userId) {
+      const userRow = db.prepare('SELECT id FROM users WHERE id = ?').get(userId);
+      if (userRow) validUserId = userId;
+    }
+    if (!validUserId) {
+      const adminRow = db.prepare('SELECT id FROM users ORDER BY id ASC LIMIT 1').get() as { id: number } | undefined;
+      if (adminRow) validUserId = adminRow.id;
+    }
 
     const tx = db.transaction(() => {
       // A. Update Bank Accounts Opening Balances
@@ -370,7 +402,7 @@ export class SettingsService {
             financial_year_id, transaction_date, transaction_type,
             amount_cents, running_balance_cents, reference_no, description, created_by
           ) VALUES (?, ?, 'adjustment', ?, ?, 'OPN-CASH', 'Cash in Hand Opening Balance', ?)
-        `).run(yearId, txDate, cashCents, cashCents, userId || null);
+        `).run(yearId, txDate, cashCents, cashCents, validUserId);
       }
 
       // Recalculate running_balance_cents for all cash transactions in this financial year
@@ -421,11 +453,11 @@ export class SettingsService {
             voucher_no, voucher_date, financial_year_id,
             type, amount_cents, payee, description, receipt_attached, status, created_by
           ) VALUES ('OPN-PETTY-CASH', ?, ?, 'replenishment', ?, 'School Impress / Float Opening', 'Opening Petty Cash Float', 0, 'approved', ?)
-        `).run(txDate, yearId, pettyCents, userId || null);
+        `).run(txDate, yearId, pettyCents, validUserId);
       }
 
       AuditService.logAuthEvent(
-        userId || null,
+        validUserId,
         'system',
         'OPENING_BALANCES_UPDATED',
         `fy:${yearId}`,
