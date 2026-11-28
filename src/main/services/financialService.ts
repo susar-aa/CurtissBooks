@@ -2324,7 +2324,7 @@ export class FinancialService {
     category_id: number;
     fund_id?: number | null;
     expense_date: string;
-    payee: string;
+    payee?: string;
     description: string;
     amount_cents: number;
     payment_method: 'cash' | 'bank' | 'petty_cash' | 'unpaid' | 'cheque';
@@ -2337,8 +2337,8 @@ export class FinancialService {
   }, userId?: number): Expense {
     const db = getDatabase();
     if (data.amount_cents <= 0) throw new Error('Expense amount must be greater than zero.');
-    if (!data.payee.trim()) throw new Error('Payee name is required.');
-    if (!data.description.trim()) throw new Error('Description is required.');
+    if (!data.description || !data.description.trim()) throw new Error('Description is required.');
+    const effectivePayee = (data.payee && data.payee.trim()) || data.description.trim() || 'General';
 
     if (data.payment_method === 'petty_cash') {
       throw new Error('Petty cash payments must be recorded directly through the dedicated Petty Cash management module.');
@@ -2444,7 +2444,7 @@ export class FinancialService {
         data.financial_year_id,
         data.category_id,
         data.fund_id || null,
-        data.payee.trim(),
+        effectivePayee,
         data.description.trim(),
         data.amount_cents,
         effectivePaymentMethod,
@@ -2475,7 +2475,7 @@ export class FinancialService {
           data.expense_date,
           data.financial_year_id,
           expenseId,
-          `Expense ${voucherNo} to ${data.payee}: ${data.description}`,
+          `Expense ${voucherNo}: ${data.description}`,
           data.amount_cents,
           userId || null
         );
@@ -2487,7 +2487,7 @@ export class FinancialService {
         `);
 
         // Debit Expense Account (e.g. 5010 = 12)
-        insertLine.run(journalId, 12, data.amount_cents, 0, `Expense recognized for ${data.payee}`);
+        insertLine.run(journalId, 12, data.amount_cents, 0, `Expense recognized: ${data.description}`);
 
         // Credit Asset / Cash Account
         if (data.payment_method === 'cash') {
@@ -2498,13 +2498,13 @@ export class FinancialService {
           db.prepare(`
             INSERT INTO cash_transactions (financial_year_id, transaction_date, transaction_type, amount_cents, running_balance_cents, reference_no, description, created_by)
             VALUES (?, ?, 'payment', ?, ?, ?, ?, ?)
-          `).run(data.financial_year_id, data.expense_date, -data.amount_cents, currentBal, voucherNo, `Expense payment to ${data.payee}`, userId || null);
+          `).run(data.financial_year_id, data.expense_date, -data.amount_cents, currentBal, voucherNo, `Expense payment: ${data.description}`, userId || null);
         } else if (effectivePaymentMethod === 'bank' && data.bank_account_id) {
           if (isCheque) {
             // CHEQUE PAYMENT:
             // Do NOT hit bank account immediately! The cheque is in 'issued' (outstanding) status.
             // Bank account will be debited when the cheque is cleared from Cheque Management page.
-            insertLine.run(journalId, 3, 0, data.amount_cents, `Cheque payment authorized for ${data.payee} (#${chqNum || 'Pending'})`);
+            insertLine.run(journalId, 3, 0, data.amount_cents, `Cheque payment authorized for ${effectivePayee} (#${chqNum || 'Pending'})`);
 
             if (chqNum) {
               const refNo = `CHQ-${chqNum}`;
@@ -2525,7 +2525,7 @@ export class FinancialService {
                 data.amount_cents,
                 data.cheque_date || data.expense_date,
                 data.expense_date,
-                data.payee.trim(),
+                effectivePayee,
                 data.bank_account_id,
                 expenseId,
                 data.category_id,
@@ -2555,7 +2555,7 @@ export class FinancialService {
               data.expense_date,
               -data.amount_cents,
               refNo,
-              data.payee.trim(),
+              effectivePayee,
               `Expense: ${data.description}`,
               userId || null
             );
@@ -2579,7 +2579,7 @@ export class FinancialService {
         financial_year_id: data.financial_year_id,
         category_id: data.category_id,
         fund_id: data.fund_id || null,
-        payee: data.payee,
+        payee: effectivePayee,
         description: data.description,
         amount_cents: data.amount_cents,
         payment_method: data.payment_method,

@@ -77,12 +77,10 @@ export const ExpenseManagementView: React.FC<ExpenseManagementViewProps> = ({ on
   const [formDate, setFormDate] = useState(new Date().toISOString().split('T')[0]);
   const [formCategoryId, setFormCategoryId] = useState<number>(0);
   const [formFundId, setFormFundId] = useState<number | null>(null);
-  const [formPayee, setFormPayee] = useState('');
   const [formDesc, setFormDesc] = useState('');
   const [formAmount, setFormAmount] = useState('');
   const [formMethod, setFormMethod] = useState<'cash' | 'bank' | 'cheque'>('cash');
   const [formRef, setFormRef] = useState('');
-  const [formBill, setFormBill] = useState('');
   const [formChequeNo, setFormChequeNo] = useState('');
   const [formChequeDate, setFormChequeDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -92,24 +90,14 @@ export const ExpenseManagementView: React.FC<ExpenseManagementViewProps> = ({ on
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
 
-  // Category Combobox & Inline Quick-Create State
+  // Category Combobox State (Subcategories Only)
   const [catSearch, setCatSearch] = useState('');
   const [catDropdownOpen, setCatDropdownOpen] = useState(false);
   const [highlightedCatIndex, setHighlightedCatIndex] = useState(0);
   const catInputRef = useRef<HTMLInputElement>(null);
   const catDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Quick-Create Category Sub-Modal
-  const [quickCreateModalOpen, setQuickCreateModalOpen] = useState(false);
-  const [quickParentId, setQuickParentId] = useState<number | null>(null);
-  const [quickCatCode, setQuickCatCode] = useState('');
-  const [quickCatNameEn, setQuickCatNameEn] = useState('');
-  const [quickCatNameSi, setQuickCatNameSi] = useState('');
-  const [quickCatAlloc, setQuickCatAlloc] = useState('');
-  const [quickCatDesc, setQuickCatDesc] = useState('');
-  const [quickCreating, setQuickCreating] = useState(false);
-
-  // Load Financial Years on mount
+  // Load Financial Years on mount — always select current active year
   useEffect(() => {
     async function initYears() {
       if (window.curtissApi?.financial?.getYears) {
@@ -161,8 +149,9 @@ export const ExpenseManagementView: React.FC<ExpenseManagementViewProps> = ({ on
         }
         if (cRes.success && cRes.data) {
           setCategories(cRes.data);
-          if (cRes.data.length > 0 && formCategoryId === 0) {
-            setFormCategoryId(cRes.data[0].id);
+          const subs = cRes.data.filter((c: BudgetCategory) => c.parent_id !== null && c.parent_id !== undefined);
+          if (subs.length > 0 && (!formCategoryId || !subs.some((s: BudgetCategory) => s.id === formCategoryId))) {
+            setFormCategoryId(subs[0].id);
           }
         }
         if (fRes.success && fRes.data) setFunds(fRes.data);
@@ -192,36 +181,32 @@ export const ExpenseManagementView: React.FC<ExpenseManagementViewProps> = ({ on
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Filter categories for searchable combobox
+  // Only subcategories (leaf categories with parent_id) can be selected for recording expenses
+  const subcategories = useMemo(() => {
+    return categories.filter((c) => c.parent_id !== null && c.parent_id !== undefined);
+  }, [categories]);
+
+  // Filter subcategories for searchable combobox
   const filteredCategories = useMemo(() => {
-    if (!catSearch.trim()) return categories;
+    if (!catSearch.trim()) return subcategories;
     const query = catSearch.toLowerCase().trim();
-    return categories.filter(
+    return subcategories.filter(
       (c) =>
         c.category_code.toLowerCase().includes(query) ||
         (c.name_en && c.name_en.toLowerCase().includes(query)) ||
-        (c.name_si && c.name_si.includes(query))
+        (c.name_si && c.name_si.includes(query)) ||
+        (c.parent_name_en && c.parent_name_en.toLowerCase().includes(query)) ||
+        (c.parent_code && c.parent_code.toLowerCase().includes(query))
     );
-  }, [categories, catSearch]);
+  }, [subcategories, catSearch]);
 
   const selectedCategory = useMemo(() => {
-    return categories.find((c) => c.id === formCategoryId);
-  }, [categories, formCategoryId]);
+    return subcategories.find((c) => c.id === formCategoryId) || categories.find((c) => c.id === formCategoryId);
+  }, [subcategories, categories, formCategoryId]);
 
   const activeFinancialYear = useMemo(() => {
     return years.find((y) => y.id === selectedYearId);
   }, [years, selectedYearId]);
-
-  // Distinct parent categories for quick-create dropdown
-  const parentCategories = useMemo(() => {
-    const map = new Map<number, { id: number; name: string; code: string }>();
-    categories.forEach((c) => {
-      if (c.parent_id && c.parent_code && c.parent_name_en) {
-        map.set(c.parent_id, { id: c.parent_id, name: c.parent_name_en, code: c.parent_code });
-      }
-    });
-    return Array.from(map.values());
-  }, [categories]);
 
   // Available remaining budget calculation for selected category
   const categoryRemainingCents = useMemo(() => {
@@ -265,74 +250,13 @@ export const ExpenseManagementView: React.FC<ExpenseManagementViewProps> = ({ on
     }
   };
 
-  // Open Quick-Create Sub-Modal
-  const handleOpenQuickCreate = () => {
-    if (parentCategories.length > 0 && !quickParentId) {
-      setQuickParentId(parentCategories[0].id);
-    }
-    setQuickCatCode('');
-    setQuickCatNameEn(catSearch.trim());
-    setQuickCatNameSi('');
-    setQuickCatAlloc('');
-    setQuickCatDesc('');
-    setQuickCreateModalOpen(true);
-  };
-
-  // Submit Quick-Create Budget Category
-  const handleQuickCreateCategory = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedYearId) return;
-    const cleanEn = quickCatNameEn.trim();
-    const cleanSi = quickCatNameSi.trim();
-    if (!cleanEn) {
-      toastError('Validation Error', 'Category English name is required.');
-      return;
-    }
-    if (!cleanSi) {
-      toastError('Validation Error', 'Please enter the Sinhala term (සිංහල නම).');
-      return;
-    }
-
-    setQuickCreating(true);
-    try {
-      const allocCents = Math.round((parseFloat(quickCatAlloc) || 0) * 100);
-      const res = await window.curtissApi.financial.quickCreateExpenseBudgetCategory({
-        financial_year_id: selectedYearId,
-        name_en: cleanEn,
-        name_si: cleanSi,
-        parent_id: quickParentId || undefined,
-        category_code: quickCatCode.trim() || undefined,
-        allocated_amount_cents: allocCents,
-        description: quickCatDesc.trim() || undefined,
-      });
-
-      if (res.success && res.data) {
-        success('Category Created', `"${res.data.name_en}" created and selected for active financial year.`);
-        const cRes = await window.curtissApi.financial.getBudgetCategories(selectedYearId);
-        if (cRes.success && cRes.data) {
-          setCategories(cRes.data);
-        }
-        setFormCategoryId(res.data.id);
-        setQuickCreateModalOpen(false);
-        setCatDropdownOpen(false);
-        setCatSearch('');
-      } else {
-        toastError('Failed to Create Category', res.error);
-      }
-    } catch (err: any) {
-      toastError('Error', err.message);
-    } finally {
-      setQuickCreating(false);
-    }
-  };
-
   // Post Expense
   const handleCreateExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedYearId) return;
 
-    if (!formCategoryId || categories.length === 0) {
-      toastError('Category Required', 'Please select a valid budget category from the active financial year.');
+    if (!formCategoryId || subcategories.length === 0) {
+      toastError('Subcategory Required', 'Please select a valid budget subcategory.');
       return;
     }
 
@@ -341,8 +265,9 @@ export const ExpenseManagementView: React.FC<ExpenseManagementViewProps> = ({ on
       toastError('Invalid Amount', 'Please provide a valid expenditure amount.');
       return;
     }
-    if (!formPayee.trim() || !formDesc.trim()) {
-      toastError('Validation Error', 'Payee and description are required.');
+    const cleanDesc = formDesc.trim();
+    if (!cleanDesc) {
+      toastError('Validation Error', 'Expenditure description is required.');
       return;
     }
     if (formMethod === 'cheque') {
@@ -361,13 +286,12 @@ export const ExpenseManagementView: React.FC<ExpenseManagementViewProps> = ({ on
         category_id: formCategoryId,
         fund_id: formFundId,
         expense_date: formDate,
-        payee: formPayee.trim(),
-        description: formDesc.trim(),
+        payee: cleanDesc,
+        description: cleanDesc,
         amount_cents: cents,
         payment_method: formMethod,
         bank_account_id: (formMethod === 'bank' || formMethod === 'cheque') ? singleBankId : null,
         reference_no: formRef.trim() || undefined,
-        bill_no: formBill.trim() || undefined,
         cheque_number: formMethod === 'cheque' ? formChequeNo.trim() : undefined,
         cheque_date: formMethod === 'cheque' ? formChequeDate : undefined,
       });
@@ -375,11 +299,9 @@ export const ExpenseManagementView: React.FC<ExpenseManagementViewProps> = ({ on
       if (res.success) {
         success('Expense Recorded', `Voucher ${res.data.voucher_no} posted successfully.`);
         setModalOpen(false);
-        setFormPayee('');
         setFormDesc('');
         setFormAmount('');
         setFormRef('');
-        setFormBill('');
         setFormChequeNo('');
         setFormChequeDate(new Date().toISOString().split('T')[0]);
         loadData();
@@ -461,39 +383,10 @@ export const ExpenseManagementView: React.FC<ExpenseManagementViewProps> = ({ on
             <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
               {expensesTotal} {expensesTotal === 1 ? 'Voucher' : 'Vouchers'}
             </span>
-            {activeFinancialYear && (
-              <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 ml-1">
-                {activeFinancialYear.year_name}
-              </span>
-            )}
-            {activeFinancialYear?.is_current && (
-              <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Active
-              </span>
-            )}
           </div>
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
-          <div className="flex items-center gap-1.5 text-xs text-zinc-500 mr-1">
-            <span className="text-[11px] font-medium hidden sm:inline">Period:</span>
-            <select
-              value={selectedYearId || ''}
-              onChange={(e) => {
-                setSelectedYearId(Number(e.target.value));
-                setExpensesPage(1);
-              }}
-              className="h-8 px-2 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-mono font-medium text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100"
-            >
-              {years.map((y) => (
-                <option key={y.id} value={y.id}>
-                  {y.year_name} {y.is_current ? '★ (Active)' : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-
           <button
             type="button"
             onClick={loadData}
@@ -586,26 +479,26 @@ export const ExpenseManagementView: React.FC<ExpenseManagementViewProps> = ({ on
           <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
           <input
             type="text"
-            placeholder="Search voucher #, payee, description, bill #..."
+            placeholder="Search voucher #, description, cheque #..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full h-8 pl-8 pr-2.5 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100 transition-colors"
           />
         </div>
 
-        {/* Category Filter */}
+        {/* Category Filter — Subcategories Only */}
         <select
           value={categoryFilter}
           onChange={(e) => {
             setCategoryFilter(e.target.value === 'all' ? 'all' : Number(e.target.value));
             setExpensesPage(1);
           }}
-          className="h-8 px-2.5 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100 max-w-[180px] truncate"
+          className="h-8 px-2.5 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100 max-w-[200px] truncate"
         >
-          <option value="all">All Categories</option>
-          {categories.map((c) => (
+          <option value="all">All Subcategories</option>
+          {subcategories.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.category_code} - {c.name_en}
+              {c.category_code} - {i18n.language === 'si' && c.name_si ? c.name_si : c.name_en}
             </option>
           ))}
         </select>
@@ -685,7 +578,7 @@ export const ExpenseManagementView: React.FC<ExpenseManagementViewProps> = ({ on
               <tr className="border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase tracking-wider font-semibold">
                 <th className="py-2.5 px-3 w-28">{tFinance('expenses.voucherNo')}</th>
                 <th className="py-2.5 px-3 w-24">{tFinance('expenses.date')}</th>
-                <th className="py-2.5 px-3">{tFinance('expenses.payee')}</th>
+                <th className="py-2.5 px-3">Description</th>
                 <th className="py-2.5 px-3">{tFinance('expenses.budgetCategory')}</th>
                 <th className="py-2.5 px-3 w-28">{tFinance('expenses.method')}</th>
                 <th className="py-2.5 px-3 w-32 text-right">{tFinance('expenses.amount')}</th>
@@ -722,9 +615,9 @@ export const ExpenseManagementView: React.FC<ExpenseManagementViewProps> = ({ on
                         {exp.expense_date}
                       </td>
                       <td className="py-2.5 px-3 text-zinc-900 dark:text-zinc-100 font-medium">
-                        <span className="text-xs">{exp.payee}</span>
-                        {exp.description && (
-                          <div className="text-[10px] text-zinc-400 font-normal truncate max-w-xs">{exp.description}</div>
+                        <span className="text-xs">{exp.description || exp.payee}</span>
+                        {exp.payee && exp.payee !== exp.description && exp.payee !== 'General' && (
+                          <div className="text-[10px] text-zinc-400 font-normal truncate max-w-xs">{exp.payee}</div>
                         )}
                       </td>
                       <td className="py-2.5 px-3 text-zinc-600 dark:text-zinc-300">
@@ -851,13 +744,13 @@ export const ExpenseManagementView: React.FC<ExpenseManagementViewProps> = ({ on
         }
       >
         <form id="expense-voucher-form" onSubmit={handleCreateExpense} className="space-y-3.5 text-xs">
-          {categories.length === 0 && (
+          {subcategories.length === 0 && (
             <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg text-xs text-amber-800 dark:text-amber-200 flex items-start space-x-2">
               <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <div>
                 <span className="font-semibold">{tFinance('budget.noAllocations')}:</span>
                 <p className="mt-0.5">
-                  Financial year "{activeFinancialYear?.year_name}" does not have any budget categories allocated yet. Use the Quick-Create button below to register and allocate a category now.
+                  No active budget subcategories are available to record expenditures against. Please configure subcategories in Annual Budget first.
                 </p>
               </div>
             </div>
@@ -883,21 +776,13 @@ export const ExpenseManagementView: React.FC<ExpenseManagementViewProps> = ({ on
             />
           </div>
 
-          {/* Interactive Keyboard-Navigable Budget Category Selector with Quick-Create */}
+          {/* Budget Subcategory Selector (Subcategories only) */}
           <div className="space-y-1 relative" ref={catDropdownRef}>
             <div className="flex items-center justify-between text-xs font-semibold text-zinc-700 dark:text-zinc-300">
               <div className="flex items-center space-x-1.5">
-                <span>{tFinance('expenses.categorySelect')}</span>
+                <span>Budget Subcategory</span>
                 <span className="text-[10px] text-zinc-400 font-normal">({tFinance('expenses.useKeysHint')})</span>
               </div>
-              <button
-                type="button"
-                onClick={handleOpenQuickCreate}
-                className="text-primary-600 hover:text-primary-700 dark:text-primary-400 font-medium flex items-center space-x-1 hover:underline text-[11px]"
-              >
-                <Plus className="w-3 h-3" />
-                <span>+ Quick-Create Category</span>
-              </button>
             </div>
 
             {catDropdownOpen ? (
@@ -908,7 +793,7 @@ export const ExpenseManagementView: React.FC<ExpenseManagementViewProps> = ({ on
                     ref={catInputRef}
                     type="text"
                     autoFocus
-                    placeholder={tFinance('expenses.categoryPlaceholder')}
+                    placeholder="Search subcategory code or name..."
                     value={catSearch}
                     onChange={(e) => {
                       setCatSearch(e.target.value);
@@ -931,18 +816,8 @@ export const ExpenseManagementView: React.FC<ExpenseManagementViewProps> = ({ on
 
                 <div className="absolute z-50 w-full mt-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-xl max-h-56 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800">
                   {filteredCategories.length === 0 ? (
-                    <div className="p-3 text-center text-xs space-y-2">
-                      <p className="text-zinc-400">No active year categories match "{catSearch}"</p>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={handleOpenQuickCreate}
-                        className="mx-auto text-xs"
-                      >
-                        <Plus className="w-3 h-3 mr-1" />
-                        Create "{catSearch}" Now
-                      </Button>
+                    <div className="p-4 text-center text-xs text-zinc-400">
+                      No budget subcategories match "{catSearch}"
                     </div>
                   ) : (
                     filteredCategories.map((c, idx) => {
@@ -972,11 +847,14 @@ export const ExpenseManagementView: React.FC<ExpenseManagementViewProps> = ({ on
                               <span>{i18n.language === 'si' && c.name_si ? c.name_si : c.name_en}</span>
                               {isSelected && <Check className="w-3.5 h-3.5 text-primary-600 inline ml-1" />}
                             </div>
-                            {c.name_si && c.name_en && (
-                              <div className="text-[11px] text-zinc-500 font-sinhala mt-0.5">
-                                {i18n.language === 'si' ? c.name_en : c.name_si}
-                              </div>
-                            )}
+                            <div className="flex items-center space-x-2 text-[10px] text-zinc-400 mt-0.5">
+                              {c.parent_name_en && (
+                                <span>Under: {c.parent_code ? `[${c.parent_code}] ` : ''}{c.parent_name_en}</span>
+                              )}
+                              {c.name_si && c.name_en && c.name_si !== c.name_en && (
+                                <span className="font-sinhala">• {i18n.language === 'si' ? c.name_en : c.name_si}</span>
+                              )}
+                            </div>
                           </div>
                           <div className="text-right font-mono text-[11px]">
                             <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
@@ -1008,11 +886,14 @@ export const ExpenseManagementView: React.FC<ExpenseManagementViewProps> = ({ on
                         </span>
                         <span>{i18n.language === 'si' && selectedCategory.name_si ? selectedCategory.name_si : selectedCategory.name_en}</span>
                       </div>
-                      {selectedCategory.name_si && selectedCategory.name_en && (
-                        <span className="text-[11px] text-zinc-500 font-sinhala mt-0.5">
-                          {i18n.language === 'si' ? selectedCategory.name_en : selectedCategory.name_si}
-                        </span>
-                      )}
+                      <div className="flex items-center space-x-2 text-[10px] text-zinc-400 mt-0.5">
+                        {selectedCategory.parent_name_en && (
+                          <span>Under: {selectedCategory.parent_code ? `[${selectedCategory.parent_code}] ` : ''}{selectedCategory.parent_name_en}</span>
+                        )}
+                        {selectedCategory.name_si && selectedCategory.name_en && selectedCategory.name_si !== selectedCategory.name_en && (
+                          <span className="font-sinhala">• {i18n.language === 'si' ? selectedCategory.name_en : selectedCategory.name_si}</span>
+                        )}
+                      </div>
                     </div>
                     <div className="text-right font-mono text-[11px] shrink-0 ml-2">
                       <span className="text-emerald-600 dark:text-emerald-400 font-semibold block">
@@ -1024,7 +905,7 @@ export const ExpenseManagementView: React.FC<ExpenseManagementViewProps> = ({ on
                     </div>
                   </div>
                 ) : (
-                  <span className="text-zinc-400">{tFinance('expenses.categoryPlaceholder')}</span>
+                  <span className="text-zinc-400">Select budget subcategory...</span>
                 )}
                 <ChevronDown className="w-4 h-4 text-zinc-400 ml-2 shrink-0" />
               </div>
@@ -1044,33 +925,22 @@ export const ExpenseManagementView: React.FC<ExpenseManagementViewProps> = ({ on
             </div>
           )}
 
-          {/* Row 3: Payee & Bill Number */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            <Input
-              label={tFinance('expenses.payeeLabel')}
-              value={formPayee}
-              onChange={(e) => setFormPayee(e.target.value)}
-              placeholder={tFinance('expenses.payeePlaceholder')}
+          {/* Row 3: Expenditure Description */}
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+              {tFinance('expenses.descLabel')} *
+            </label>
+            <textarea
+              rows={2}
+              value={formDesc}
+              onChange={(e) => setFormDesc(e.target.value)}
+              placeholder="Describe reason, scope, and particulars of this payment..."
+              className="w-full p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100 resize-none"
               required
-            />
-            <Input
-              label={tFinance('expenses.billNo')}
-              value={formBill}
-              onChange={(e) => setFormBill(e.target.value)}
-              placeholder="e.g. INV-99482"
             />
           </div>
 
-          {/* Row 4: Expenditure Description */}
-          <Input
-            label={tFinance('expenses.descLabel')}
-            value={formDesc}
-            onChange={(e) => setFormDesc(e.target.value)}
-            placeholder={tFinance('expenses.descPlaceholder')}
-            required
-          />
-
-          {/* Row 5: Payment Method & Reference */}
+          {/* Row 4: Payment Method & Reference */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div className="space-y-1">
               <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">{tFinance('expenses.paymentMethod')}</label>
@@ -1104,7 +974,7 @@ export const ExpenseManagementView: React.FC<ExpenseManagementViewProps> = ({ on
           {formMethod === 'bank' && (
             <div className="p-2.5 rounded-lg bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/40 text-blue-800 dark:text-blue-300 text-xs flex items-center space-x-2">
               <Building2 className="w-4 h-4 text-blue-500 shrink-0" />
-              <span>Direct bank payment disbursed from institutional account: <strong>{bankAccounts[0]?.bank_name || 'Bank of Ceylon'} ({bankAccounts[0]?.account_number || '1004829104'})</strong></span>
+              <span>Direct bank payment disbursed from institutional account: <strong>{bankAccounts[0]?.bank_name || 'Commercial Bank'} ({bankAccounts[0]?.account_number || 'Main Account'})</strong></span>
             </div>
           )}
 
@@ -1116,7 +986,7 @@ export const ExpenseManagementView: React.FC<ExpenseManagementViewProps> = ({ on
                   <span>Cheque Issuance Details (Auto-tracks in Cheque Management)</span>
                 </div>
                 <span className="text-[11px] font-normal text-purple-700 dark:text-purple-400">
-                  Drawn on: <strong>{bankAccounts[0]?.bank_name || 'Bank of Ceylon'} ({bankAccounts[0]?.account_number || '1004829104'})</strong>
+                  Drawn on: <strong>{bankAccounts[0]?.bank_name || 'Commercial Bank'} ({bankAccounts[0]?.account_number || 'Main Account'})</strong>
                 </span>
               </div>
 
@@ -1138,96 +1008,6 @@ export const ExpenseManagementView: React.FC<ExpenseManagementViewProps> = ({ on
               </div>
             </div>
           )}
-        </form>
-      </Modal>
-
-      {/* Quick-Create Budget Category Popup Sub-Modal */}
-      <Modal
-        isOpen={quickCreateModalOpen}
-        onClose={() => setQuickCreateModalOpen(false)}
-        title="Quick-Create Budget Category"
-        maxWidth="sm"
-        zIndex="z-[60]"
-      >
-        <form onSubmit={handleQuickCreateCategory} className="space-y-3.5 text-xs">
-          <p className="text-[11px] text-zinc-500">
-            Quick-creates a new budget subcategory and allocates it directly to the active operational year (<strong>{activeFinancialYear?.year_name}</strong>).
-          </p>
-
-          {parentCategories.length > 0 && (
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                Parent Main Category (Group)
-              </label>
-              <select
-                value={quickParentId || ''}
-                onChange={(e) => setQuickParentId(Number(e.target.value))}
-                className="w-full h-9 px-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs font-medium text-zinc-900 dark:text-zinc-100"
-              >
-                {parentCategories.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.code} - {p.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="English Name *"
-              value={quickCatNameEn}
-              onChange={(e) => setQuickCatNameEn(e.target.value)}
-              placeholder="e.g. Science Lab Equipment"
-              required
-              autoFocus
-            />
-            <Input
-              label="Sinhala Term (සිංහල නම) *"
-              value={quickCatNameSi}
-              onChange={(e) => setQuickCatNameSi(e.target.value)}
-              placeholder="e.g. විද්‍යාගාර උපකරණ"
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="Category Code (Optional)"
-              value={quickCatCode}
-              onChange={(e) => setQuickCatCode(e.target.value)}
-              placeholder="Auto-generated if empty"
-            />
-            <Input
-              label="Initial Allocation (Rs.)"
-              type="number"
-              step="0.01"
-              value={quickCatAlloc}
-              onChange={(e) => setQuickCatAlloc(e.target.value)}
-              placeholder="0.00"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-              Description (Optional)
-            </label>
-            <textarea
-              value={quickCatDesc}
-              onChange={(e) => setQuickCatDesc(e.target.value)}
-              placeholder="Brief description of this expenditure scope..."
-              className="w-full h-16 p-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 resize-none"
-            />
-          </div>
-
-          <div className="flex justify-end space-x-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
-            <Button variant="outline" type="button" onClick={() => setQuickCreateModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" isLoading={quickCreating}>
-              Save & Select
-            </Button>
-          </div>
         </form>
       </Modal>
 
