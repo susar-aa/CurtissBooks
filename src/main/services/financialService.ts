@@ -820,6 +820,7 @@ export class FinancialService {
       name_si?: string;
       description?: string;
       is_active?: boolean;
+      parent_id?: number | null;
     },
     userId?: number
   ): ReusableCategory {
@@ -829,6 +830,25 @@ export class FinancialService {
 
     const updates: string[] = ['updated_at = CURRENT_TIMESTAMP'];
     const params: any[] = [];
+
+    let targetParentId = existing.parent_id;
+    if (data.parent_id !== undefined) {
+      targetParentId = data.parent_id === null ? null : Number(data.parent_id);
+      if (targetParentId !== null) {
+        if (targetParentId === id) {
+          throw new Error('A category cannot be its own parent.');
+        }
+        const parentCat = db.prepare('SELECT id, parent_id, name FROM budget_categories WHERE id = ?').get(targetParentId) as any;
+        if (!parentCat) {
+          throw new Error('Selected parent category does not exist.');
+        }
+        if (parentCat.parent_id !== null) {
+          throw new Error('A subcategory can only be assigned to a top-level Main Category.');
+        }
+      }
+      updates.push('parent_id = ?');
+      params.push(targetParentId);
+    }
 
     if (data.category_code !== undefined) {
       const cleanCode = data.category_code.trim();
@@ -848,9 +868,9 @@ export class FinancialService {
 
       let dupSql = 'SELECT id FROM budget_categories WHERE LOWER(COALESCE(name, name_en)) = LOWER(?) AND id != ?';
       const dupParams: any[] = [cleanName, id];
-      if (existing.parent_id !== null) {
+      if (targetParentId !== null) {
         dupSql += ' AND parent_id = ?';
-        dupParams.push(existing.parent_id);
+        dupParams.push(targetParentId);
       } else {
         dupSql += ' AND parent_id IS NULL';
       }

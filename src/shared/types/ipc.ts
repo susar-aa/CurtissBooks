@@ -153,7 +153,7 @@ export interface ElectronAPI {
     getReusableCategories: (search?: string, activeOnly?: boolean) => Promise<IpcResult<any[]>>;
     suggestCategoryCode: (parentId?: number | null) => Promise<IpcResult<string>>;
     quickCreateCategory: (name: string, name_si?: string, parentId?: number | null, customCode?: string) => Promise<IpcResult<any>>;
-    updateCategory: (id: number, data: { category_code?: string; name?: string; name_en?: string; name_si?: string; description?: string; is_active?: boolean }) => Promise<IpcResult<any>>;
+    updateCategory: (id: number, data: { category_code?: string; name?: string; name_en?: string; name_si?: string; description?: string; is_active?: boolean; parent_id?: number | null }) => Promise<IpcResult<any>>;
     toggleCategoryStatus: (id: number, isActive: boolean) => Promise<IpcResult<boolean>>;
     getAccounts: () => Promise<IpcResult<any[]>>;
     getBudgetCategories: (yearId?: number) => Promise<IpcResult<any[]>>;

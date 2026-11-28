@@ -46,6 +46,7 @@ interface SubcategoryRowProps {
     name: string;
     name_si?: string;
     is_parent?: boolean;
+    parent_id?: number | null;
   }) => void;
   t: any;
 }
@@ -154,6 +155,7 @@ const SubcategoryRow: React.FC<SubcategoryRowProps> = React.memo(
                     name: alloc.category_name,
                     name_si: alloc.category_name_si || '',
                     is_parent: false,
+                    parent_id: alloc.parent_id || null,
                   })
                 }
                 className="p-1 rounded text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
@@ -258,10 +260,12 @@ export const FinancialYearView: React.FC = () => {
     name: string;
     name_si?: string;
     is_parent?: boolean;
+    parent_id?: number | null;
   } | null>(null);
   const [editCatCode, setEditCatCode] = useState('');
   const [editCatName, setEditCatName] = useState('');
   const [editCatNameSi, setEditCatNameSi] = useState('');
+  const [editCatParentId, setEditCatParentId] = useState<number | null>(null);
   const [savingCategoryEdit, setSavingCategoryEdit] = useState(false);
 
   // Existing Category Allocation Modal State
@@ -589,19 +593,55 @@ export const FinancialYearView: React.FC = () => {
   };
 
   // Open Edit Category Modal
-  const openEditCategoryModal = (cat: {
+  const openEditCategoryModal = async (cat: {
     id: number;
     category_code: string;
     name: string;
     name_si?: string;
     is_parent?: boolean;
+    parent_id?: number | null;
   }) => {
     setEditingCategory(cat);
     setEditCatCode(cat.category_code || '');
     setEditCatName(cat.name || '');
     setEditCatNameSi(cat.name_si || '');
+    setEditCatParentId(cat.parent_id !== undefined ? cat.parent_id : null);
+
+    // If editing a subcategory, ensure all system main categories are loaded
+    if (!cat.is_parent && window.curtissApi?.financial?.getReusableCategories) {
+      try {
+        const res = await window.curtissApi.financial.getReusableCategories('', true);
+        if (res.success && res.data) {
+          const mains = res.data.filter((c: any) => c.is_parent || c.parent_id === null);
+          setMainCategoriesList(mains);
+        }
+      } catch (err) {
+        console.error('Failed to load main categories for edit modal:', err);
+      }
+    }
+
     setEditCatModalOpen(true);
   };
+
+  // Candidate main categories for subcategory parent assignment
+  const availableParents = useMemo(() => {
+    const map = new Map<number, { id: number; category_code?: string; name: string }>();
+    mainCategoriesList.forEach((m) => {
+      map.set(m.id, { id: m.id, category_code: m.category_code, name: m.name || m.name_en || '' });
+    });
+    allocations.forEach((a) => {
+      if (!a.parent_id) {
+        map.set(a.category_id, {
+          id: a.category_id,
+          category_code: a.category_code,
+          name: a.category_name,
+        });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) =>
+      (a.category_code || '').localeCompare(b.category_code || '')
+    );
+  }, [mainCategoriesList, allocations]);
 
   // Confirm Edit Category
   const handleConfirmEditCategory = async (e: React.FormEvent) => {
@@ -623,15 +663,26 @@ export const FinancialYearView: React.FC = () => {
     setSavingCategoryEdit(true);
     try {
       if (window.curtissApi?.financial?.updateCategory) {
-        const res = await window.curtissApi.financial.updateCategory(editingCategory.id, {
+        const payload: any = {
           category_code: cleanCode,
           name: cleanName,
           name_en: cleanName,
           name_si: cleanSi || undefined,
-        });
+        };
+        if (!editingCategory.is_parent) {
+          payload.parent_id = editCatParentId;
+        }
+
+        const res = await window.curtissApi.financial.updateCategory(editingCategory.id, payload);
 
         if (res.success && res.data) {
           success('Category Updated', `Category updated successfully to "${cleanName}" (${cleanCode}).`);
+
+          const updatedCat = res.data;
+          const newParentId = updatedCat.parent_id !== undefined ? updatedCat.parent_id : editCatParentId;
+          const newParentCode = updatedCat.parent_code;
+          const newParentName = updatedCat.parent_name;
+          const newParentNameSi = updatedCat.parent_name_si;
 
           // Update local allocations table immediately
           setAllocations((prev) =>
@@ -643,6 +694,10 @@ export const FinancialYearView: React.FC = () => {
                   category_code: cleanCode,
                   category_name: cleanName,
                   category_name_si: cleanSi || updated.category_name_si,
+                  parent_id: newParentId,
+                  parent_code: newParentCode || updated.parent_code,
+                  parent_name: newParentName || updated.parent_name,
+                  parent_name_si: newParentNameSi || updated.parent_name_si,
                 };
               }
               if (a.parent_id === editingCategory.id) {
@@ -2183,6 +2238,27 @@ export const FinancialYearView: React.FC = () => {
         maxWidth="md"
       >
         <form onSubmit={handleConfirmEditCategory} className="space-y-4">
+          {!editingCategory?.is_parent && (
+            <div className="space-y-1">
+              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                Parent Category (Main Category)
+              </label>
+              <select
+                value={editCatParentId ?? ''}
+                onChange={(e) => setEditCatParentId(e.target.value ? Number(e.target.value) : null)}
+                className="flex h-9 w-full rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-xs text-zinc-900 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-900 focus-visible:border-zinc-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:focus-visible:ring-zinc-300 dark:focus-visible:border-zinc-300 font-medium"
+                required
+              >
+                <option value="" disabled>Select Parent Category...</option>
+                {availableParents.map((parent) => (
+                  <option key={parent.id} value={parent.id}>
+                    {parent.category_code ? `[${parent.category_code}] ` : ''}{parent.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div className="space-y-1">
             <div className="flex items-center justify-between">
               <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300">

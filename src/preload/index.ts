@@ -144,7 +144,7 @@ const api: ElectronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.FINANCIAL_SUGGEST_CATEGORY_CODE, parentId),
     quickCreateCategory: (name: string, name_si?: string, parentId?: number | null, customCode?: string): Promise<IpcResult<any>> =>
       ipcRenderer.invoke(IPC_CHANNELS.FINANCIAL_QUICK_CREATE_CATEGORY, name, name_si, parentId, customCode),
-    updateCategory: (id: number, data: { category_code?: string; name?: string; name_en?: string; name_si?: string; description?: string; is_active?: boolean }): Promise<IpcResult<any>> =>
+    updateCategory: (id: number, data: { category_code?: string; name?: string; name_en?: string; name_si?: string; description?: string; is_active?: boolean; parent_id?: number | null }): Promise<IpcResult<any>> =>
       ipcRenderer.invoke(IPC_CHANNELS.FINANCIAL_UPDATE_CATEGORY, id, data),
     toggleCategoryStatus: (id: number, isActive: boolean): Promise<IpcResult<boolean>> =>
       ipcRenderer.invoke(IPC_CHANNELS.FINANCIAL_TOGGLE_CATEGORY_STATUS, id, isActive),
