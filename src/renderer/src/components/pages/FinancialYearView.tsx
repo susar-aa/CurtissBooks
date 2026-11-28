@@ -395,7 +395,7 @@ export const FinancialYearView: React.FC = () => {
     }, 150);
   };
 
-  // 4. Existing Category Allocation Modal
+  // 4. Existing Category Allocation Modal & Category Selection Handler
   const openAllocateExistingModal = (cat: ReusableCategory) => {
     setSelectedExistingCat(cat);
     const existingAlloc = allocations.find((a) => a.category_id === cat.id);
@@ -403,6 +403,54 @@ export const FinancialYearView: React.FC = () => {
     setExistingCatNotes(existingAlloc?.notes || '');
     setDropdownOpen(false);
     setAllocExistingModalOpen(true);
+  };
+
+  const handleSelectCategory = (cat: ReusableCategory) => {
+    const isMain = cat.is_parent || cat.parent_id === null;
+    if (isMain) {
+      const alreadyInAlloc = allocations.some((a) => a.category_id === cat.id);
+      if (alreadyInAlloc) {
+        warning('Already Added', `Main Category "${cat.name}" is already in the budget table.`);
+      } else {
+        setAllocations((prev) => [
+          ...prev,
+          {
+            category_id: cat.id,
+            category_code: cat.category_code,
+            category_name: cat.name,
+            category_name_si: cat.name_si,
+            parent_id: null,
+            parent_code: null,
+            parent_name: null,
+            parent_name_si: null,
+            allocated_amount_cents: 0,
+            notes: '',
+          },
+        ]);
+        setMainCategoriesList((prev) => {
+          if (prev.some((m) => m.id === cat.id)) return prev;
+          return [
+            ...prev,
+            {
+              id: cat.id,
+              name: cat.name,
+              name_en: cat.name_en || cat.name,
+              name_si: cat.name_si,
+              category_code: cat.category_code,
+              parent_id: null,
+              is_parent: true,
+              is_active: true,
+            },
+          ];
+        });
+        success('Main Category Added', `Main Category "${cat.name}" added to budget table.`);
+      }
+      setSearchQuery('');
+      setDropdownOpen(false);
+      focusSearchInput();
+    } else {
+      openAllocateExistingModal(cat);
+    }
   };
 
   const handleConfirmAllocateExisting = (e: React.FormEvent) => {
@@ -557,8 +605,8 @@ export const FinancialYearView: React.FC = () => {
                 parent_code: null,
                 parent_name: null,
                 parent_name_si: null,
-                allocated_amount_cents: cents,
-                notes: newCatNotes.trim(),
+                allocated_amount_cents: 0,
+                notes: '',
               },
             ]);
 
@@ -777,7 +825,7 @@ export const FinancialYearView: React.FC = () => {
       if (!trimmed && highlightedIndex < 0) return;
 
       if (highlightedIndex >= 0 && highlightedIndex < searchResults.length) {
-        openAllocateExistingModal(searchResults[highlightedIndex]);
+        handleSelectCategory(searchResults[highlightedIndex]);
       } else if (highlightedIndex === searchResults.length && showCreateOption) {
         openCreateCategoryModal(trimmed);
       } else {
@@ -785,9 +833,9 @@ export const FinancialYearView: React.FC = () => {
           (c) => c.name.toLowerCase() === trimmed.toLowerCase()
         );
         if (exactMatch) {
-          openAllocateExistingModal(exactMatch);
+          handleSelectCategory(exactMatch);
         } else if (searchResults.length > 0 && searchResults[0].name.toLowerCase().startsWith(trimmed.toLowerCase())) {
-          openAllocateExistingModal(searchResults[0]);
+          handleSelectCategory(searchResults[0]);
         } else if (trimmed) {
           openCreateCategoryModal(trimmed);
         }
@@ -874,13 +922,9 @@ export const FinancialYearView: React.FC = () => {
       }
     });
 
-    // Pass 3: Calculate subtotals
+    // Pass 3: Calculate subtotals (Main Category budget is strictly total of all subcategories)
     groupsMap.forEach((g) => {
-      if (g.subcategories.length > 0) {
-        g.totalCents = g.subcategories.reduce((acc, item) => acc + (item.alloc.allocated_amount_cents || 0), 0);
-      } else if (g.mainAllocItem) {
-        g.totalCents = g.mainAllocItem.alloc.allocated_amount_cents || 0;
-      }
+      g.totalCents = g.subcategories.reduce((acc, item) => acc + (item.alloc.allocated_amount_cents || 0), 0);
     });
 
     return Array.from(groupsMap.values()).sort((a, b) => a.parentCode.localeCompare(b.parentCode));
@@ -1519,7 +1563,7 @@ export const FinancialYearView: React.FC = () => {
                           key={cat.id}
                           onMouseDown={(e) => {
                             e.preventDefault();
-                            openAllocateExistingModal(cat);
+                            handleSelectCategory(cat);
                           }}
                           className={`flex items-center justify-between px-3 py-2 text-xs cursor-pointer transition-colors ${
                             isHighlighted
