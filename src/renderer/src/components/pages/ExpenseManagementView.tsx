@@ -24,9 +24,7 @@ import {
   TrendingDown,
   ArrowUpRight,
 } from 'lucide-react';
-import { PageHeader } from '../ui/PageHeader';
 import { Button } from '../ui/Button';
-import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Modal } from '../ui/Modal';
 import { Input } from '../ui/Input';
@@ -452,306 +450,299 @@ export const ExpenseManagementView: React.FC<ExpenseManagementViewProps> = ({ on
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-6 select-none font-sans">
-      <PageHeader
-        title={tFinance('expenses.title')}
-        subtitle={tFinance('expenses.subtitle')}
-        badge={
-          <Badge variant="error" size="md">
-            <Receipt className="w-3.5 h-3.5 mr-1 inline" />
-            {tFinance('expenses.badge')}
-          </Badge>
-        }
-        actions={
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm" onClick={loadData} isLoading={loading}>
-              <RefreshCw className="w-3.5 h-3.5 mr-1" />
-              <span>Refresh</span>
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => {
-                setCatDropdownOpen(false);
-                setCatSearch('');
-                setModalOpen(true);
-              }}
-              disabled={activeFinancialYear?.status === 'closed'}
-            >
-              <Plus className="w-3.5 h-3.5 mr-1" />
-              {tFinance('expenses.recordExpense')}
-            </Button>
-          </div>
-        }
-      />
-
-      {/* Active Financial Year Selector Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-xs gap-3">
-        <div className="flex items-center space-x-3">
-          <div className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
-            <Calendar className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-xs text-zinc-500 font-medium">{tFinance('expenses.operationalPeriod')}</div>
-            <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex items-center space-x-2">
-              <span>{activeFinancialYear ? activeFinancialYear.year_name : 'Loading...'}</span>
-              {activeFinancialYear?.is_current ? (
-                <Badge variant="success" size="sm">{tFinance('expenses.activeRunningYear')}</Badge>
-              ) : (
-                <Badge variant={activeFinancialYear?.status === 'closed' ? 'neutral' : 'warning'} size="sm">
-                  {tCommon(`status.${activeFinancialYear?.status}`, activeFinancialYear?.status?.toUpperCase())}
-                </Badge>
-              )}
-            </div>
+    <div className="p-4 max-w-[1400px] mx-auto flex flex-col h-[calc(100vh-7rem)] space-y-3 select-none font-sans">
+      {/* Top Header Bar */}
+      <div className="flex items-center justify-between pb-2.5 border-b border-zinc-200 dark:border-zinc-800 flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <h1 className="text-sm font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+              {tFinance('expenses.title')}
+            </h1>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+              {expensesTotal} {expensesTotal === 1 ? 'Voucher' : 'Vouchers'}
+            </span>
+            {activeFinancialYear && (
+              <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 ml-1">
+                {activeFinancialYear.year_name}
+              </span>
+            )}
+            {activeFinancialYear?.is_current && (
+              <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Active
+              </span>
+            )}
           </div>
         </div>
 
-        <div className="flex items-center space-x-2">
-          <span className="text-xs text-zinc-500 font-medium">{tFinance('expenses.switchPeriod')}</span>
-          <select
-            value={selectedYearId || ''}
-            onChange={(e) => {
-              setSelectedYearId(Number(e.target.value));
-              setExpensesPage(1);
-            }}
-            className="h-8 px-2.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs font-medium text-zinc-800 dark:text-zinc-200"
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-1.5 text-xs text-zinc-500 mr-1">
+            <span className="text-[11px] font-medium hidden sm:inline">Period:</span>
+            <select
+              value={selectedYearId || ''}
+              onChange={(e) => {
+                setSelectedYearId(Number(e.target.value));
+                setExpensesPage(1);
+              }}
+              className="h-8 px-2 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-mono font-medium text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+            >
+              {years.map((y) => (
+                <option key={y.id} value={y.id}>
+                  {y.year_name} {y.is_current ? '★ (Active)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            type="button"
+            onClick={loadData}
+            className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            title="Refresh"
           >
-            {years.map((y) => (
-              <option key={y.id} value={y.id}>
-                {y.year_name} {y.is_current ? `★ (${tFinance('expenses.activeRunningYear')})` : `(${tCommon(`status.${y.status}`, y.status)})`}
-              </option>
-            ))}
-          </select>
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+
+          <Button
+            size="sm"
+            onClick={() => {
+              setCatDropdownOpen(false);
+              setCatSearch('');
+              setModalOpen(true);
+            }}
+            disabled={activeFinancialYear?.status === 'closed'}
+            className="text-xs"
+          >
+            <Plus className="w-3.5 h-3.5 mr-1" />
+            <span>{tFinance('expenses.recordExpense')}</span>
+          </Button>
         </div>
       </div>
 
-      {/* KPI Cards: Detailed Expenditure Overview */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <Card className="border-l-4 border-l-red-500 shadow-xs">
-          <CardHeader className="pb-1">
-            <span className="text-xs text-zinc-500 font-medium flex items-center justify-between">
-              <span>{tFinance('expenses.totalExpenses')}</span>
-              <TrendingDown className="w-3.5 h-3.5 text-red-500" />
-            </span>
-            <div className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 mt-1">
+      {/* Metric Cards — Compact Sleek Bar */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 flex-shrink-0">
+        <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3.5 py-2 flex items-center justify-between shadow-xs">
+          <div>
+            <span className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400 block">Total Expenses</span>
+            <span className="text-sm font-bold font-mono text-zinc-900 dark:text-zinc-100 tabular-nums">
               Rs. {(summary.total_cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-            </div>
-            <span className="text-[10px] text-zinc-400">{summary.total_count} Vouchers Posted</span>
-          </CardHeader>
-        </Card>
-
-        <Card className="border-l-4 border-l-amber-500 shadow-xs">
-          <CardHeader className="pb-1">
-            <span className="text-xs text-zinc-500 font-medium flex items-center justify-between">
-              <span>Cash Payments</span>
-              <Wallet className="w-3.5 h-3.5 text-amber-500" />
             </span>
-            <div className="text-xl font-bold tracking-tight text-amber-600 dark:text-amber-400 mt-1">
+          </div>
+          <div className="p-2 rounded-md bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400">
+            <TrendingDown className="w-4 h-4" />
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3.5 py-2 flex items-center justify-between shadow-xs">
+          <div>
+            <span className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400 block">Cash Payments</span>
+            <span className="text-sm font-bold font-mono text-amber-600 dark:text-amber-400 tabular-nums">
               Rs. {(summary.cash_cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-            </div>
-            <span className="text-[10px] text-zinc-400">Institutional Cash in Hand</span>
-          </CardHeader>
-        </Card>
-
-        <Card className="border-l-4 border-l-blue-500 shadow-xs">
-          <CardHeader className="pb-1">
-            <span className="text-xs text-zinc-500 font-medium flex items-center justify-between">
-              <span>Bank Payments</span>
-              <Building2 className="w-3.5 h-3.5 text-blue-500" />
             </span>
-            <div className="text-xl font-bold tracking-tight text-blue-600 dark:text-blue-400 mt-1">
-              Rs. {(summary.bank_cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-            </div>
-            <span className="text-[10px] text-zinc-400">{bankAccounts[0]?.bank_name || 'Bank'} Direct Transfers</span>
-          </CardHeader>
-        </Card>
+          </div>
+          <div className="p-2 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400">
+            <Wallet className="w-4 h-4" />
+          </div>
+        </div>
 
-        <Card
-          className={`border-l-4 border-l-purple-500 shadow-xs ${onNavigateCheques ? 'cursor-pointer hover:bg-purple-50/20 dark:hover:bg-purple-950/20 transition-colors' : ''}`}
+        <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3.5 py-2 flex items-center justify-between shadow-xs">
+          <div>
+            <span className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400 block">Bank Payments</span>
+            <span className="text-sm font-bold font-mono text-blue-600 dark:text-blue-400 tabular-nums">
+              Rs. {(summary.bank_cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </span>
+          </div>
+          <div className="p-2 rounded-md bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">
+            <Building2 className="w-4 h-4" />
+          </div>
+        </div>
+
+        <div
           onClick={() => onNavigateCheques?.('issued')}
+          className={`rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3.5 py-2 flex items-center justify-between shadow-xs ${
+            onNavigateCheques ? 'cursor-pointer hover:border-purple-300 dark:hover:border-purple-800 transition-colors' : ''
+          }`}
           title={onNavigateCheques ? 'Click to view in Cheque Management' : undefined}
         >
-          <CardHeader className="pb-1">
-            <span className="text-xs text-zinc-500 font-medium flex items-center justify-between">
+          <div>
+            <span className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400 flex items-center gap-1">
               <span>Cheques Issued</span>
-              <CreditCard className="w-3.5 h-3.5 text-purple-500" />
+              {onNavigateCheques && <ArrowUpRight className="w-2.5 h-2.5 text-purple-500" />}
             </span>
-            <div className="text-xl font-bold tracking-tight text-purple-600 dark:text-purple-400 mt-1">
+            <span className="text-sm font-bold font-mono text-purple-600 dark:text-purple-400 tabular-nums">
               Rs. {(summary.cheque_cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-            </div>
-            <span className="text-[10px] text-zinc-400 flex items-center space-x-1">
-              <span>Tracked in Cheque Module</span>
-              {onNavigateCheques && <ArrowUpRight className="w-2.5 h-2.5 text-purple-500 inline" />}
             </span>
-          </CardHeader>
-        </Card>
+          </div>
+          <div className="p-2 rounded-md bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400">
+            <CreditCard className="w-4 h-4" />
+          </div>
+        </div>
       </div>
 
       {/* Filter and Search Bar */}
-      <Card className="shadow-xs">
-        <CardContent className="p-3.5 space-y-3">
-          <div className="flex flex-wrap items-center gap-2.5">
-            {/* Search Input */}
-            <div className="relative flex-1 min-w-[240px]">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-              <input
-                type="text"
-                placeholder="Search voucher #, payee, description, bill #, cheque #..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:outline-hidden focus:ring-1 focus:ring-zinc-950 dark:focus:ring-zinc-100"
-              />
-            </div>
+      <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+        {/* Search Input */}
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+          <input
+            type="text"
+            placeholder="Search voucher #, payee, description, bill #..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full h-8 pl-8 pr-2.5 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100 transition-colors"
+          />
+        </div>
 
-            {/* Category Filter */}
-            <div className="w-48">
-              <select
-                value={categoryFilter}
-                onChange={(e) => {
-                  setCategoryFilter(e.target.value === 'all' ? 'all' : Number(e.target.value));
-                  setExpensesPage(1);
-                }}
-                className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900"
-              >
-                <option value="all">All Budget Categories</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.category_code} - {c.name_en}
-                  </option>
-                ))}
-              </select>
-            </div>
+        {/* Category Filter */}
+        <select
+          value={categoryFilter}
+          onChange={(e) => {
+            setCategoryFilter(e.target.value === 'all' ? 'all' : Number(e.target.value));
+            setExpensesPage(1);
+          }}
+          className="h-8 px-2.5 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100 max-w-[180px] truncate"
+        >
+          <option value="all">All Categories</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.category_code} - {c.name_en}
+            </option>
+          ))}
+        </select>
 
-            {/* Payment Method Filter */}
-            <div className="w-36">
-              <select
-                value={methodFilter}
-                onChange={(e) => {
-                  setMethodFilter(e.target.value);
-                  setExpensesPage(1);
-                }}
-                className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900"
-              >
-                <option value="all">All Methods</option>
-                <option value="cash">Cash in Hand</option>
-                <option value="bank">Bank Transfer</option>
-                <option value="cheque">Cheque</option>
-              </select>
-            </div>
+        {/* Payment Method Filter */}
+        <select
+          value={methodFilter}
+          onChange={(e) => {
+            setMethodFilter(e.target.value);
+            setExpensesPage(1);
+          }}
+          className="h-8 px-2.5 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+        >
+          <option value="all">All Methods</option>
+          <option value="cash">Cash in Hand</option>
+          <option value="bank">Bank Transfer</option>
+          <option value="cheque">Cheque</option>
+        </select>
 
-            {/* Status Filter */}
-            <div className="w-32">
-              <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
-                  setExpensesPage(1);
-                }}
-                className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900"
-              >
-                <option value="all">All Statuses</option>
-                <option value="approved">Approved</option>
-                <option value="reversed">Reversed</option>
-              </select>
-            </div>
+        {/* Status Filter */}
+        <select
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setExpensesPage(1);
+          }}
+          className="h-8 px-2.5 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+        >
+          <option value="all">All Statuses</option>
+          <option value="approved">Approved</option>
+          <option value="reversed">Reversed</option>
+        </select>
 
-            {/* Date Filters */}
-            <div className="flex items-center space-x-1.5 text-xs text-zinc-500">
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => {
-                  setDateFrom(e.target.value);
-                  setExpensesPage(1);
-                }}
-                className="px-2 py-1 text-xs rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900"
-                title="From Date"
-              />
-              <span>to</span>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => {
-                  setDateTo(e.target.value);
-                  setExpensesPage(1);
-                }}
-                className="px-2 py-1 text-xs rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900"
-                title="To Date"
-              />
-            </div>
+        {/* Date Filters */}
+        <div className="flex items-center gap-1 text-xs text-zinc-400">
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => {
+              setDateFrom(e.target.value);
+              setExpensesPage(1);
+            }}
+            className="h-8 px-2 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 font-mono"
+            title="From Date"
+          />
+          <span className="text-[10px]">to</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => {
+              setDateTo(e.target.value);
+              setExpensesPage(1);
+            }}
+            className="h-8 px-2 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 font-mono"
+            title="To Date"
+          />
+        </div>
 
-            {/* Reset Filters Button */}
-            {hasActiveFilters && (
-              <Button variant="outline" size="sm" onClick={handleResetFilters} className="text-xs h-7.5 px-2">
-                <X className="w-3.5 h-3.5 mr-1" />
-                Clear
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+        {/* Reset Filters Button */}
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={handleResetFilters}
+            className="h-8 px-2.5 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 flex items-center gap-1 transition-colors"
+          >
+            <X className="w-3 h-3" />
+            <span>Clear</span>
+          </button>
+        )}
+      </div>
 
-      {/* Expenses Table */}
-      <Card className="shadow-xs">
-        <CardHeader className="py-3 px-4 border-b border-zinc-100 dark:border-zinc-800">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-semibold flex items-center space-x-2">
-              <Receipt className="w-4 h-4 text-zinc-400" />
-              <span>{tFinance('expenses.tableTitle')} ({activeFinancialYear?.year_name})</span>
-            </CardTitle>
-            <span className="text-xs text-zinc-400">
-              Total {expensesTotal} vouchers recorded
-            </span>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-zinc-50/80 dark:bg-zinc-900/50 text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
+      {/* Expenses Table — Scrollable with Zebra Striping */}
+      <div className="flex-1 min-h-0 border border-zinc-200 dark:border-zinc-700 rounded-lg overflow-hidden flex flex-col bg-white dark:bg-zinc-900">
+        <div className="flex-1 overflow-y-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="sticky top-0 z-10">
+              <tr className="border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase tracking-wider font-semibold">
+                <th className="py-2.5 px-3 w-28">{tFinance('expenses.voucherNo')}</th>
+                <th className="py-2.5 px-3 w-24">{tFinance('expenses.date')}</th>
+                <th className="py-2.5 px-3">{tFinance('expenses.payee')}</th>
+                <th className="py-2.5 px-3">{tFinance('expenses.budgetCategory')}</th>
+                <th className="py-2.5 px-3 w-28">{tFinance('expenses.method')}</th>
+                <th className="py-2.5 px-3 w-32 text-right">{tFinance('expenses.amount')}</th>
+                <th className="py-2.5 px-3 w-24 text-center">{tFinance('expenses.status')}</th>
+                <th className="py-2.5 px-2 w-16 text-center">{tCommon('labels.actions')}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
+              {expenses.length === 0 ? (
                 <tr>
-                  <th className="py-2.5 px-3 font-semibold">{tFinance('expenses.voucherNo')}</th>
-                  <th className="py-2.5 px-3 font-semibold">{tFinance('expenses.date')}</th>
-                  <th className="py-2.5 px-3 font-semibold">{tFinance('expenses.payee')}</th>
-                  <th className="py-2.5 px-3 font-semibold">{tFinance('expenses.budgetCategory')}</th>
-                  <th className="py-2.5 px-3 font-semibold">{tFinance('expenses.method')}</th>
-                  <th className="py-2.5 px-3 font-semibold text-right">{tFinance('expenses.amount')}</th>
-                  <th className="py-2.5 px-3 font-semibold">{tFinance('expenses.status')}</th>
-                  <th className="py-2.5 px-3 font-semibold text-right">{tCommon('labels.actions')}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                {expenses.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="text-center py-8 text-zinc-400">
+                  <td colSpan={8} className="text-center py-16 text-zinc-400">
+                    <Receipt className="w-8 h-8 text-zinc-300 dark:text-zinc-600 mx-auto mb-2 opacity-50" />
+                    <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
                       {hasActiveFilters ? 'No expenditure vouchers match the filter criteria.' : tFinance('expenses.empty')}
-                    </td>
-                  </tr>
-                ) : (
-                  expenses.map((exp) => (
-                    <tr key={exp.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/40 transition-colors">
-                      <td className="py-2.5 px-3 font-mono font-semibold text-zinc-900 dark:text-zinc-100">
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                expenses.map((exp, idx) => {
+                  const isEven = idx % 2 === 0;
+                  return (
+                    <tr
+                      key={exp.id}
+                      className={`group/row transition-colors ${
+                        isEven
+                          ? 'bg-white dark:bg-zinc-900'
+                          : 'bg-zinc-50/70 dark:bg-zinc-800/25'
+                      } hover:bg-blue-50/40 dark:hover:bg-blue-950/20`}
+                    >
+                      <td className="py-2.5 px-3 font-mono font-semibold text-zinc-900 dark:text-zinc-100 text-xs">
                         {exp.voucher_no}
                       </td>
-                      <td className="py-2.5 px-3 font-mono text-zinc-500">{exp.expense_date}</td>
+                      <td className="py-2.5 px-3 font-mono text-zinc-500 text-[11px] tabular-nums">
+                        {exp.expense_date}
+                      </td>
                       <td className="py-2.5 px-3 text-zinc-900 dark:text-zinc-100 font-medium">
-                        {exp.payee}
-                        <div className="text-[10px] text-zinc-400 font-normal truncate max-w-xs">{exp.description}</div>
+                        <span className="text-xs">{exp.payee}</span>
+                        {exp.description && (
+                          <div className="text-[10px] text-zinc-400 font-normal truncate max-w-xs">{exp.description}</div>
+                        )}
                       </td>
                       <td className="py-2.5 px-3 text-zinc-600 dark:text-zinc-300">
                         <div className="font-medium text-zinc-900 dark:text-zinc-100 flex items-center space-x-1.5">
-                          <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
+                          <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-semibold">
                             {exp.category_code}
                           </span>
-                          <span>{i18n.language === 'si' && exp.category_name_si ? exp.category_name_si : exp.category_name_en}</span>
+                          <span className="text-xs">{i18n.language === 'si' && exp.category_name_si ? exp.category_name_si : exp.category_name_en}</span>
                         </div>
                         {exp.category_name_si && exp.category_name_en && exp.category_name_si !== exp.category_name_en && (
-                          <div className="text-[11px] text-zinc-500 font-sinhala">
+                          <div className="text-[10px] text-zinc-400 font-sinhala">
                             {i18n.language === 'si' ? exp.category_name_en : exp.category_name_si}
                           </div>
                         )}
                       </td>
                       <td className="py-2.5 px-3">
                         <div className="flex flex-col">
-                          <span className="capitalize font-mono text-[11px] text-zinc-600 dark:text-zinc-300">
+                          <span className="capitalize font-mono text-[11px] text-zinc-700 dark:text-zinc-300">
                             {exp.cheque_number ? 'Cheque' : tCommon(`paymentMethods.${exp.payment_method}`, exp.payment_method.replace('_', ' '))}
                           </span>
                           {exp.cheque_number && (
@@ -772,20 +763,20 @@ export const ExpenseManagementView: React.FC<ExpenseManagementViewProps> = ({ on
                           )}
                         </div>
                       </td>
-                      <td className="py-2.5 px-3 text-right font-mono font-semibold text-red-600 dark:text-red-400">
+                      <td className="py-2.5 px-3 text-right font-mono font-bold text-red-600 dark:text-red-400 text-xs tabular-nums">
                         Rs. {(exp.amount_cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                       </td>
-                      <td className="py-2.5 px-3">
+                      <td className="py-2.5 px-3 text-center">
                         <Badge variant={exp.status === 'approved' ? 'success' : exp.status === 'reversed' ? 'error' : 'neutral'} size="sm">
                           {tCommon(`status.${exp.status}`, exp.status.toUpperCase())}
                         </Badge>
                       </td>
-                      <td className="py-2.5 px-3 text-right">
+                      <td className="py-2.5 px-2 text-center">
                         {exp.status !== 'reversed' && (
                           <button
                             type="button"
                             onClick={() => handleOpenCancelModal(exp)}
-                            className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 transition-colors"
+                            className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/40 text-zinc-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
                             title="Reverse / Cancel Expense"
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
@@ -793,46 +784,49 @@ export const ExpenseManagementView: React.FC<ExpenseManagementViewProps> = ({ on
                         )}
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
 
-          {/* Pagination Controls */}
+        {/* Pagination & Summary Footer */}
+        <div className="flex items-center justify-between px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800/50 border-t border-zinc-200 dark:border-zinc-700 flex-shrink-0 text-xs">
+          <span className="text-zinc-500">
+            {expensesTotal === 0
+              ? '0 records'
+              : `Showing ${Math.min((expensesPage - 1) * EXPENSES_PAGE_SIZE + 1, expensesTotal)} to ${Math.min(expensesPage * EXPENSES_PAGE_SIZE, expensesTotal)} of ${expensesTotal} records`}
+          </span>
           {totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-zinc-100 dark:border-zinc-800 text-xs">
-              <span className="text-zinc-500">
-                Showing {Math.min((expensesPage - 1) * EXPENSES_PAGE_SIZE + 1, expensesTotal)} to{' '}
-                {Math.min(expensesPage * EXPENSES_PAGE_SIZE, expensesTotal)} of {expensesTotal} records
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setExpensesPage((p) => Math.max(1, p - 1))}
+                disabled={expensesPage <= 1}
+                className="text-xs h-7 px-2"
+              >
+                <ChevronLeft className="w-3 h-3 mr-0.5" />
+                Previous
+              </Button>
+              <span className="font-mono text-xs text-zinc-600 dark:text-zinc-400 px-1">
+                {expensesPage} / {totalPages}
               </span>
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setExpensesPage((p) => Math.max(1, p - 1))}
-                  disabled={expensesPage <= 1}
-                >
-                  <ChevronLeft className="w-3.5 h-3.5 mr-1" />
-                  Previous
-                </Button>
-                <span className="font-medium text-zinc-700 dark:text-zinc-300 px-2">
-                  Page {expensesPage} of {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setExpensesPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={expensesPage >= totalPages}
-                >
-                  Next
-                  <ChevronRight className="w-3.5 h-3.5 ml-1" />
-                </Button>
-              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setExpensesPage((p) => Math.min(totalPages, p + 1))}
+                disabled={expensesPage >= totalPages}
+                className="text-xs h-7 px-2"
+              >
+                Next
+                <ChevronRight className="w-3 h-3 ml-0.5" />
+              </Button>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Record Expenditure Voucher Modal */}
       <Modal
