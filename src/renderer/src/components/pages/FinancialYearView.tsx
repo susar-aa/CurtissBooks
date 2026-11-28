@@ -11,14 +11,11 @@ import {
   Search,
   Sparkles,
   AlertTriangle,
-  FolderPlus,
   ShieldCheck,
   ChevronRight,
   Layers,
   ArrowLeft,
   Calendar,
-  Clock,
-  Eye,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
@@ -36,9 +33,9 @@ import {
 interface SubcategoryRowProps {
   alloc: BudgetAllocationItem;
   originalIndex: number;
+  subIndex: number;
   isReadOnly: boolean;
   onAmountChange: (index: number, valStr: string) => void;
-  onNotesChange: (index: number, notesStr: string) => void;
   onRemoveCategory: (index: number) => void;
   onEditCategory: (cat: {
     id: number;
@@ -55,9 +52,9 @@ const SubcategoryRow: React.FC<SubcategoryRowProps> = React.memo(
   ({
     alloc,
     originalIndex,
+    subIndex,
     isReadOnly,
     onAmountChange,
-    onNotesChange,
     onRemoveCategory,
     onEditCategory,
     t,
@@ -65,7 +62,6 @@ const SubcategoryRow: React.FC<SubcategoryRowProps> = React.memo(
     const [amountStr, setAmountStr] = useState<string>(
       alloc.allocated_amount_cents === 0 ? '' : (alloc.allocated_amount_cents / 100).toString()
     );
-    const [notesStr, setNotesStr] = useState<string>(alloc.notes || '');
 
     useEffect(() => {
       const formatted =
@@ -75,50 +71,46 @@ const SubcategoryRow: React.FC<SubcategoryRowProps> = React.memo(
       }
     }, [alloc.allocated_amount_cents]);
 
-    useEffect(() => {
-      if ((alloc.notes || '') !== notesStr) {
-        setNotesStr(alloc.notes || '');
-      }
-    }, [alloc.notes]);
-
     const handleAmountChangeLocal = (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = e.target.value;
       setAmountStr(val);
       onAmountChange(originalIndex, val);
     };
 
-    const handleNotesChangeLocal = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const val = e.target.value;
-      setNotesStr(val);
-      onNotesChange(originalIndex, val);
-    };
+    const isEven = subIndex % 2 === 0;
 
     return (
-      <tr className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30 transition-colors">
-        <td className="py-2.5 px-4 text-center text-zinc-400 font-mono">
+      <tr
+        className={`group/row transition-colors ${
+          isEven
+            ? 'bg-white dark:bg-zinc-900'
+            : 'bg-zinc-50/70 dark:bg-zinc-800/25'
+        } hover:bg-blue-50/40 dark:hover:bg-blue-950/20`}
+      >
+        <td className="py-2.5 px-3 text-center text-zinc-400 text-xs font-mono tabular-nums w-12">
           {originalIndex + 1}
         </td>
-        <td className="py-2.5 px-4 pl-8">
-          <div className="flex items-center space-x-2">
-            <ChevronRight className="w-3 h-3 text-zinc-400 flex-shrink-0" />
+        <td className="py-2.5 px-4 pl-6">
+          <div className="flex items-center gap-2">
+            <ChevronRight className="w-3.5 h-3.5 text-zinc-300 dark:text-zinc-600 flex-shrink-0" />
             {alloc.category_code && (
-              <span className="font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 text-[11px] font-semibold flex-shrink-0">
+              <span className="font-mono text-xs font-semibold text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded flex-shrink-0">
                 {alloc.category_code}
               </span>
             )}
-            <span className="font-medium text-zinc-900 dark:text-zinc-100">
+            <span className="text-xs font-medium text-zinc-900 dark:text-zinc-100">
               {alloc.category_name}
             </span>
+            {alloc.category_name_si && alloc.category_name_si !== alloc.category_name && (
+              <span className="text-xs text-zinc-400 font-sinhala">
+                ({alloc.category_name_si})
+              </span>
+            )}
           </div>
-          {alloc.category_name_si && alloc.category_name_si !== alloc.category_name && (
-            <div className="text-[11px] text-zinc-500 font-sinhala ml-5 mt-0.5">
-              {alloc.category_name_si}
-            </div>
-          )}
         </td>
-        <td className="py-2.5 px-4">
-          <div className="relative">
-            <span className="absolute left-2.5 top-2 text-zinc-400 font-mono text-[11px]">
+        <td className="py-2 px-4 w-52">
+          <div className="relative w-44 ml-auto">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 font-mono text-xs">
               Rs.
             </span>
             <input
@@ -129,23 +121,13 @@ const SubcategoryRow: React.FC<SubcategoryRowProps> = React.memo(
               value={amountStr}
               placeholder="0.00"
               onChange={handleAmountChangeLocal}
-              className="w-full pl-8 pr-2 py-1 text-xs rounded border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-mono text-right focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100 disabled:opacity-75 disabled:cursor-not-allowed"
+              className="w-full pl-8 pr-2.5 py-1.5 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-mono text-right tabular-nums focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
             />
           </div>
         </td>
-        <td className="py-2.5 px-4">
-          <input
-            type="text"
-            disabled={isReadOnly}
-            value={notesStr}
-            placeholder={t('optionalNotes')}
-            onChange={handleNotesChangeLocal}
-            className="w-full px-2 py-1 text-xs rounded border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100 disabled:opacity-75 disabled:cursor-not-allowed"
-          />
-        </td>
         {!isReadOnly && (
-          <td className="py-2.5 px-4 text-center">
-            <div className="flex items-center justify-center space-x-1">
+          <td className="py-2 px-3 text-center w-20">
+            <div className="flex items-center justify-center gap-1 opacity-0 group-hover/row:opacity-100 transition-opacity">
               <button
                 type="button"
                 onClick={() =>
@@ -159,14 +141,14 @@ const SubcategoryRow: React.FC<SubcategoryRowProps> = React.memo(
                   })
                 }
                 className="p-1 rounded text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                title="Edit Subcategory Code & Name"
+                title="Edit"
               >
                 <Edit3 className="w-3.5 h-3.5" />
               </button>
               <button
                 type="button"
                 onClick={() => onRemoveCategory(originalIndex)}
-                className="p-1 rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                className="p-1 rounded text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
                 title={t('actions.remove')}
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -1141,116 +1123,79 @@ export const FinancialYearView: React.FC = () => {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-4 select-none">
+    <div className="p-4 max-w-[1400px] mx-auto space-y-3 select-none">
       {activeView === 'list' ? (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {/* List View Header & Actions */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-200 dark:border-zinc-800">
+          <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
             <div>
-              <div className="flex items-center space-x-2">
-                <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
-                  {t('existingYears', 'Financial Years')}
-                </h1>
-                <span className="px-2 py-0.5 rounded-full text-xs font-mono font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
-                  {years.length} {years.length === 1 ? 'Year' : 'Years'}
-                </span>
-              </div>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                {t('subtitle', 'Manage school annual fiscal calendar, budget ceilings, and approvals.')}
-              </p>
+              <h1 className="text-sm font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+                {t('existingYears', 'Financial Years')}
+                <span className="ml-2 text-xs font-normal text-zinc-500">{years.length}</span>
+              </h1>
             </div>
 
-            <div className="flex items-center space-x-2 flex-shrink-0">
-              <Button
-                variant="outline"
-                size="sm"
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                type="button"
                 onClick={() => loadYears()}
-                isLoading={loading}
-                title={t('actions.refresh', 'Refresh')}
+                className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                title="Refresh"
               >
-                <RefreshCw className="w-3.5 h-3.5" />
-              </Button>
-              <Button size="sm" onClick={handleStartNewYear}>
-                <Plus className="w-3.5 h-3.5 mr-1" />
-                <span>{t('newFinancialYear', 'Create New Financial Year')}</span>
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+              <Button size="sm" onClick={handleStartNewYear} className="text-xs">
+                <Plus className="w-3 h-3 mr-1" />
+                <span>New Financial Year</span>
               </Button>
             </div>
           </div>
 
-          {/* List View Summary KPI Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Card className="border-l-4 border-l-emerald-500 shadow-sm">
-              <CardContent className="p-3">
-                <span className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider block">
-                  Active Financial Period
-                </span>
-                <div className="text-base font-bold font-mono text-zinc-900 dark:text-zinc-100 mt-0.5 truncate">
-                  {years.find((y) => y.is_current)?.year_name || 'No Active Year Set'}
-                </div>
-                <span className="text-[10px] text-zinc-400">
-                  Current institutional operating year
-                </span>
-              </CardContent>
-            </Card>
-
-            <Card className="border-l-4 border-l-purple-500 shadow-sm">
-              <CardContent className="p-3">
-                <span className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider block">
-                  Approved & Locked Budgets
-                </span>
-                <div className="text-base font-bold font-mono text-zinc-900 dark:text-zinc-100 mt-0.5">
-                  {years.filter((y) => y.status === 'approved' || y.status === 'locked').length} Periods
-                </div>
-                <span className="text-[10px] text-zinc-400">
-                  Authorized annual budgets with locked ceilings
-                </span>
-              </CardContent>
-            </Card>
-
-            <Card className="border-l-4 border-l-amber-500 shadow-sm">
-              <CardContent className="p-3">
-                <span className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider block">
-                  Draft Financial Periods
-                </span>
-                <div className="text-base font-bold font-mono text-zinc-900 dark:text-zinc-100 mt-0.5">
-                  {years.filter((y) => y.status === 'draft').length} Drafts
-                </div>
-                <span className="text-[10px] text-zinc-400">
-                  In-progress budget drafts awaiting authorization
-                </span>
-              </CardContent>
-            </Card>
+          {/* Compact Summary Stats */}
+          <div className="flex items-center gap-4 text-xs text-zinc-500">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span>Active: <strong className="text-zinc-900 dark:text-zinc-100">{years.find((y) => y.is_current)?.year_name || '—'}</strong></span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-purple-500" />
+              <span>Approved: <strong className="text-zinc-900 dark:text-zinc-100">{years.filter((y) => y.status === 'approved' || y.status === 'locked').length}</strong></span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-amber-500" />
+              <span>Drafts: <strong className="text-zinc-900 dark:text-zinc-100">{years.filter((y) => y.status === 'draft').length}</strong></span>
+            </div>
           </div>
 
           {/* Search & Status Filters */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-400" />
+          <div className="flex items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-xs">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
               <input
                 type="text"
                 value={listSearch}
                 onChange={(e) => setListSearch(e.target.value)}
-                placeholder="Search financial years by name or approver..."
-                className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100 shadow-xs"
+                placeholder="Search years..."
+                className="w-full pl-8 pr-3 py-1.5 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500 transition-colors"
               />
             </div>
 
-            <div className="flex items-center space-x-1.5 overflow-x-auto text-xs">
+            <div className="flex items-center gap-1 text-xs">
               {(
                 [
-                  { id: 'all', label: `All (${years.length})` },
-                  { id: 'draft', label: `Draft (${years.filter((y) => y.status === 'draft').length})` },
-                  { id: 'approved', label: `Approved (${years.filter((y) => y.status === 'approved' || y.status === 'locked').length})` },
-                  { id: 'closed', label: `Closed (${years.filter((y) => y.status === 'closed').length})` },
+                  { id: 'all', label: 'All' },
+                  { id: 'draft', label: 'Draft' },
+                  { id: 'approved', label: 'Approved' },
+                  { id: 'closed', label: 'Closed' },
                 ] as const
               ).map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setStatusFilter(tab.id)}
-                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
                     statusFilter === tab.id
-                      ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xs'
-                      : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700'
+                      ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+                      : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'
                   }`}
                 >
                   {tab.label}
@@ -1261,27 +1206,20 @@ export const FinancialYearView: React.FC = () => {
 
           {/* Financial Years List Items */}
           {filteredYears.length === 0 ? (
-            <Card>
-              <CardContent className="p-12 text-center">
-                <CalendarDays className="w-10 h-10 text-zinc-300 dark:text-zinc-600 mx-auto mb-3" />
-                <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-                  {years.length === 0 ? 'No Financial Years Created Yet' : 'No matching financial years found'}
-                </h3>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 max-w-sm mx-auto">
-                  {years.length === 0
-                    ? 'Start by creating your first school financial year to allocate budgets and manage expenses.'
-                    : 'Try clearing the search query or status filter to see other financial periods.'}
-                </p>
-                {years.length === 0 && (
-                  <Button size="sm" onClick={handleStartNewYear} className="mt-4">
-                    <Plus className="w-3.5 h-3.5 mr-1" />
-                    <span>Create First Financial Year</span>
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
+            <div className="py-16 text-center">
+              <CalendarDays className="w-8 h-8 text-zinc-300 dark:text-zinc-600 mx-auto mb-2" />
+              <h3 className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                {years.length === 0 ? 'No Financial Years' : 'No matching results'}
+              </h3>
+              {years.length === 0 && (
+                <Button size="sm" onClick={handleStartNewYear} className="mt-3 text-xs">
+                  <Plus className="w-3 h-3 mr-1" />
+                  <span>Create First Year</span>
+                </Button>
+              )}
+            </div>
           ) : (
-            <div className="space-y-2.5">
+            <div className="space-y-1.5">
               {filteredYears.map((y) => {
                 const isAppr = y.status === 'approved' || y.status === 'locked';
                 const isCls = y.status === 'closed';
@@ -1295,11 +1233,11 @@ export const FinancialYearView: React.FC = () => {
                   <div
                     key={y.id}
                     onClick={() => handleSelectYear(y.id)}
-                    className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/70 hover:border-zinc-400 dark:hover:border-zinc-600 hover:shadow-sm cursor-pointer transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 group"
+                    className="group px-4 py-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-400 dark:hover:border-zinc-600 cursor-pointer transition-all flex items-center justify-between gap-4"
                   >
-                    <div className="flex items-start space-x-3.5">
+                    <div className="flex items-center gap-3 min-w-0">
                       <div
-                        className={`p-2.5 rounded-lg flex-shrink-0 mt-0.5 ${
+                        className={`p-2 rounded-lg flex-shrink-0 ${
                           isCls
                             ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'
                             : isAppr
@@ -1308,29 +1246,29 @@ export const FinancialYearView: React.FC = () => {
                         }`}
                       >
                         {isCls ? (
-                          <Lock className="w-5 h-5" />
+                          <Lock className="w-4 h-4" />
                         ) : isAppr ? (
-                          <ShieldCheck className="w-5 h-5" />
+                          <ShieldCheck className="w-4 h-4" />
                         ) : (
-                          <Edit3 className="w-5 h-5" />
+                          <Edit3 className="w-4 h-4" />
                         )}
                       </div>
 
-                      <div className="space-y-1">
-                        <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-                          <span className="text-base font-bold text-zinc-900 dark:text-zinc-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors font-mono">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100 font-mono group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                             {y.year_name}
                           </span>
                           {y.is_current && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center space-x-1">
+                            <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                              <span>Current Active Year</span>
+                              <span>Active</span>
                             </span>
                           )}
                           <span
-                            className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider ${
+                            className={`px-1.5 py-0.5 rounded text-[9px] uppercase font-bold tracking-wider ${
                               isCls
-                                ? 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border border-zinc-500/20'
+                                ? 'bg-zinc-500/10 text-zinc-500 border border-zinc-500/20'
                                 : isAppr
                                 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
                                 : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
@@ -1340,40 +1278,28 @@ export const FinancialYearView: React.FC = () => {
                           </span>
                         </div>
 
-                        <div className="flex items-center space-x-4 text-xs text-zinc-500 dark:text-zinc-400 flex-wrap gap-y-1">
-                          <div className="flex items-center space-x-1 font-mono">
-                            <Calendar className="w-3.5 h-3.5 text-zinc-400" />
-                            <span>
-                              {y.start_date} &rarr; {y.end_date}
-                            </span>
-                          </div>
+                        <div className="flex items-center gap-3 text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                          <span className="font-mono flex items-center gap-1">
+                            <Calendar className="w-3 h-3 text-zinc-400" />
+                            {y.start_date} → {y.end_date}
+                          </span>
                           {y.approver_name && (
-                            <div className="flex items-center space-x-1">
-                              <ShieldCheck className="w-3.5 h-3.5 text-zinc-400" />
-                              <span>Approved by {y.approver_name}</span>
-                            </div>
+                            <span className="flex items-center gap-1">
+                              <ShieldCheck className="w-3 h-3 text-zinc-400" />
+                              {y.approver_name}
+                            </span>
                           )}
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between md:justify-end space-x-6 border-t md:border-t-0 pt-2 md:pt-0 border-zinc-100 dark:border-zinc-800">
-                      <div className="text-left md:text-right">
-                        <span className="text-[10px] uppercase font-semibold text-zinc-400 block tracking-wider">
-                          Total Budget
-                        </span>
-                        <span className="text-sm font-bold font-mono text-zinc-900 dark:text-zinc-100">
+                    <div className="flex items-center gap-4 flex-shrink-0">
+                      <div className="text-right">
+                        <span className="text-sm font-bold font-mono text-zinc-900 dark:text-zinc-100 tabular-nums">
                           Rs. {budgetFormatted}
                         </span>
                       </div>
-
-                      <button
-                        type="button"
-                        className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 group-hover:bg-zinc-900 group-hover:text-white dark:group-hover:bg-zinc-100 dark:group-hover:text-zinc-900 transition-colors flex-shrink-0"
-                      >
-                        <span>{isDrf ? 'Edit Budget' : 'Open Panel'}</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
+                      <ChevronRight className="w-4 h-4 text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-zinc-100 transition-colors" />
                     </div>
                   </div>
                 );
@@ -1383,10 +1309,10 @@ export const FinancialYearView: React.FC = () => {
         </div>
       ) : (
         /* DETAIL PANEL VIEW (Opened on tap) */
-        <div className="space-y-4">
-          {/* Detail Panel Top Navigation Bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-200 dark:border-zinc-800">
-            <div className="flex items-center space-x-3">
+        <div className="flex flex-col h-[calc(100vh-7rem)] space-y-3">
+          {/* Top Header Bar */}
+          <div className="flex items-center justify-between pb-2.5 border-b border-zinc-200 dark:border-zinc-800 flex-shrink-0">
+            <div className="flex items-center gap-3">
               <Button
                 variant="outline"
                 size="sm"
@@ -1397,21 +1323,22 @@ export const FinancialYearView: React.FC = () => {
                 <span>All Financial Years</span>
               </Button>
 
-              <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800 hidden sm:block" />
+              <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800" />
 
-              <div className="flex items-center space-x-2">
-                <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100 font-mono">
-                  {isNewYear ? 'New Financial Year Draft' : yearName}
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 font-mono">
+                  {isNewYear ? 'New Financial Year' : yearName}
                 </h2>
                 {isCurrent && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                    Current Year
+                  <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Active
                   </span>
                 )}
                 <span
-                  className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold ${
+                  className={`px-1.5 py-0.5 rounded text-[9px] uppercase font-bold tracking-wider ${
                     isClosed
-                      ? 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border border-zinc-500/20'
+                      ? 'bg-zinc-500/10 text-zinc-500 border border-zinc-500/20'
                       : isApproved
                       ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
                       : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
@@ -1422,7 +1349,38 @@ export const FinancialYearView: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex items-center space-x-2 flex-shrink-0">
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg text-xs font-mono mr-1">
+                <span className="text-[11px] font-sans text-zinc-500 uppercase tracking-wider">Total:</span>
+                <span className="font-bold text-zinc-900 dark:text-zinc-100">Rs. {totalBudgetFormatted}</span>
+              </div>
+
+              {!isReadOnly && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSaveDraft}
+                    isLoading={saving}
+                    disabled={approving}
+                    className="text-xs"
+                  >
+                    <Edit3 className="w-3 h-3 mr-1" />
+                    <span>{saving ? t('saving') : t('saveDraft')}</span>
+                  </Button>
+
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleOpenApprovalModal}
+                    disabled={saving || allocations.length === 0}
+                    className="text-xs"
+                  >
+                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                    <span>{t('approveBudget')}</span>
+                  </Button>
+                </>
+              )}
               {isApproved && !isClosed && (
                 <Button
                   variant="outline"
@@ -1430,129 +1388,92 @@ export const FinancialYearView: React.FC = () => {
                   onClick={() => setEndYearModalOpen(true)}
                   className="border-red-300 text-red-600 dark:border-red-800 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 text-xs"
                 >
-                  <AlertTriangle className="w-3.5 h-3.5 mr-1" />
+                  <AlertTriangle className="w-3 h-3 mr-1" />
                   <span>{t('endYearBtn')}</span>
                 </Button>
               )}
-              <Button
-                variant="outline"
-                size="sm"
+              <button
+                type="button"
                 onClick={() => selectedYearId && loadYearDetail(selectedYearId)}
-                isLoading={loading}
+                className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                title="Refresh"
               >
-                <RefreshCw className="w-3.5 h-3.5" />
-              </Button>
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              </button>
             </div>
           </div>
 
-          {/* Financial Year Basic Information */}
-          <Card>
-            <CardContent className="p-3.5">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <Input
-                  label={t('yearName')}
+          {/* Financial Year Inputs Bar (No KPI Cards) */}
+          <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-3 flex-shrink-0">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-[11px] font-medium text-zinc-500 dark:text-zinc-400 mb-1">
+                  {t('yearName')}
+                </label>
+                <input
+                  type="text"
                   value={yearName}
                   onChange={(e) => setYearName(e.target.value)}
                   placeholder={t('yearNamePlaceholder')}
                   disabled={isReadOnly}
                   required
+                  className="w-full h-8 px-2.5 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-mono font-semibold focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
                 />
-                <Input
-                  label={t('startDate')}
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-zinc-500 dark:text-zinc-400 mb-1">
+                  {t('startDate')}
+                </label>
+                <input
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
                   disabled={isReadOnly}
                   required
+                  className="w-full h-8 px-2.5 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
                 />
-                <Input
-                  label={t('endDate')}
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-zinc-500 dark:text-zinc-400 mb-1">
+                  {t('endDate')}
+                </label>
+                <input
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
                   disabled={isReadOnly}
                   required
+                  className="w-full h-8 px-2.5 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
                 />
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Financial Year Summary KPI Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Card className="border-l-4 border-l-emerald-500 shadow-sm">
-              <CardContent className="p-3">
-                <span className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider block">
-                  {t('totalBudget', 'Total Annual Budget')}
-                </span>
-                <div className="text-lg font-bold font-mono text-zinc-900 dark:text-zinc-100 mt-0.5">
-                  Rs. {totalBudgetFormatted}
-                </div>
-                <span className="text-[10px] text-zinc-400">
-                  {isApproved ? 'Approved & Locked Budget' : 'Draft Budget (Editable)'}
-                </span>
-              </CardContent>
-            </Card>
-
-            <Card className="border-l-4 border-l-purple-500 shadow-sm">
-              <CardContent className="p-3">
-                <span className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider block">
-                  Main Budget Categories
-                </span>
-                <div className="text-lg font-bold font-mono text-zinc-900 dark:text-zinc-100 mt-0.5">
-                  {groupedAllocations.length} Main Categories
-                </div>
-                <span className="text-[10px] text-zinc-400">
-                  Aggregated parent heads
-                </span>
-              </CardContent>
-            </Card>
-
-            <Card className="border-l-4 border-l-blue-500 shadow-sm">
-              <CardContent className="p-3">
-                <span className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider block">
-                  Budget Ceilings (Subcategories)
-                </span>
-                <div className="text-lg font-bold font-mono text-zinc-900 dark:text-zinc-100 mt-0.5">
-                  {allocations.filter((a) => a.parent_id !== null).length} Subcategories
-                </div>
-                <span className="text-[10px] text-zinc-400">
-                  Active expense spending limits
-                </span>
-              </CardContent>
-            </Card>
+            </div>
           </div>
 
-          {/* Category Search & Quick Actions */}
+          {/* Category Search Bar */}
           {!isReadOnly && (
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center gap-2 flex-shrink-0">
               <div className="relative flex-1" ref={searchContainerRef}>
-                <div className="relative">
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
-                  <input
-                    ref={searchInputRef}
-                    type="text"
-                    value={searchQuery}
-                    onChange={handleSearchChange}
-                    onKeyDown={handleSearchKeyDown}
-                    onFocus={handleSearchFocus}
-                    placeholder="Search or select budget category (Main or Subcategory)..."
-                    className="w-full pl-9 pr-24 py-2 text-xs rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 shadow-sm"
-                  />
-                  <div className="absolute right-2 top-2 text-[10px] text-zinc-400 flex items-center space-x-1">
-                    <kbd className="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
-                      ↑↓ Navigate
-                    </kbd>
-                    <kbd className="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
-                      Enter ↵
-                    </kbd>
-                  </div>
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={handleSearchChange}
+                  onKeyDown={handleSearchKeyDown}
+                  onFocus={handleSearchFocus}
+                  placeholder="Search or select budget category (Main or Subcategory)..."
+                  className="w-full pl-8 pr-20 py-2 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500 transition-colors"
+                />
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-zinc-400 flex items-center gap-1">
+                  <kbd className="px-1 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">↑↓</kbd>
+                  <kbd className="px-1 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">Enter</kbd>
                 </div>
 
                 {/* Autocomplete Dropdown */}
                 {dropdownOpen && (
                   <div
                     ref={dropdownListRef}
-                    className="absolute left-0 right-0 mt-1 max-h-64 overflow-y-auto bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-xl z-50 py-1 divide-y divide-zinc-100 dark:divide-zinc-800/60"
+                    className="absolute left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg z-50 py-0.5"
                   >
                     {searchResults.map((cat, idx) => {
                       const isMain = cat.is_parent || cat.parent_id === null;
@@ -1565,45 +1486,28 @@ export const FinancialYearView: React.FC = () => {
                             e.preventDefault();
                             handleSelectCategory(cat);
                           }}
-                          className={`flex items-center justify-between px-3 py-2 text-xs cursor-pointer transition-colors ${
+                          className={`flex items-center justify-between px-3 py-1.5 text-xs cursor-pointer transition-colors ${
                             isHighlighted
-                              ? 'bg-zinc-100 dark:bg-zinc-800 ring-1 ring-zinc-400 dark:ring-zinc-600'
-                              : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                              ? 'bg-zinc-100 dark:bg-zinc-800'
+                              : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
                           } ${alreadyAdded ? 'border-l-2 border-emerald-500' : ''}`}
                         >
-                          <div className="flex flex-col">
-                            <div className="flex items-center space-x-1.5">
-                              <span className="font-semibold text-zinc-900 dark:text-zinc-100">
-                                {cat.name}
-                              </span>
-                              <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider ${
-                                isMain
-                                  ? 'bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20'
-                                  : 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20'
-                              }`}>
-                                {isMain ? 'Main Category' : `Subcategory of: ${cat.parent_code || cat.parent_name}`}
-                              </span>
-                            </div>
-                            {cat.name_si && cat.name_si !== cat.name && (
-                              <span className="text-[11px] text-zinc-500 font-sinhala">
-                                {cat.name_si}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <span className="text-[10px] font-mono text-zinc-400">
-                              {cat.category_code}
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="font-mono text-[10px] text-zinc-400 flex-shrink-0">{cat.category_code}</span>
+                            <span className="font-medium text-zinc-900 dark:text-zinc-100 truncate">{cat.name}</span>
+                            <span className={`flex-shrink-0 px-1 py-0.5 rounded text-[8px] font-bold uppercase ${
+                              isMain
+                                ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400'
+                                : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                            }`}>
+                              {isMain ? 'Main' : 'Sub'}
                             </span>
-                            {alreadyAdded ? (
-                              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
-                                In Budget (Edit)
-                              </span>
-                            ) : (
-                              <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">
-                                + Add to Budget
-                              </span>
-                            )}
                           </div>
+                          <span className={`text-[10px] flex-shrink-0 font-medium ${
+                            alreadyAdded ? 'text-emerald-600 dark:text-emerald-400' : 'text-blue-600 dark:text-blue-400'
+                          }`}>
+                            {alreadyAdded ? '✓ Added' : '+ Add'}
+                          </span>
                         </div>
                       );
                     })}
@@ -1615,19 +1519,19 @@ export const FinancialYearView: React.FC = () => {
                           e.preventDefault();
                           openCreateCategoryModal(searchQuery);
                         }}
-                        className={`flex items-center justify-between px-3 py-2.5 text-xs cursor-pointer border-t border-blue-100 dark:border-blue-900 ${
+                        className={`flex items-center justify-between px-3 py-2 text-xs cursor-pointer border-t border-zinc-100 dark:border-zinc-800 ${
                           highlightedIndex === searchResults.length
-                            ? 'bg-blue-100 dark:bg-blue-900/60 ring-2 ring-blue-500 text-blue-800 dark:text-blue-200'
-                            : 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40'
+                            ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300'
+                            : 'text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'
                         }`}
                       >
-                        <div className="flex items-center space-x-2">
-                          <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                        <div className="flex items-center gap-1.5">
+                          <Sparkles className="w-3 h-3" />
                           <span className="font-semibold">
                             {t('createCategory', { name: searchQuery.trim() })}
                           </span>
                         </div>
-                        <span className="text-[10px] opacity-75">{t('pressEnterToCreate')}</span>
+                        <span className="text-[9px] opacity-75">{t('pressEnterToCreate')}</span>
                       </div>
                     )}
                   </div>
@@ -1639,41 +1543,34 @@ export const FinancialYearView: React.FC = () => {
                 onClick={() => openCreateCategoryModal('')}
                 className="flex-shrink-0 text-xs whitespace-nowrap"
               >
-                <Plus className="w-3.5 h-3.5 mr-1" />
-                <span>Create Category</span>
+                <Plus className="w-3 h-3 mr-1" />
+                <span>New Category</span>
               </Button>
             </div>
           )}
 
-          {/* Compact Budget Allocation Table */}
-          <Card>
-            <CardHeader className="pb-3 border-b border-zinc-100 dark:border-zinc-800 flex flex-row items-center justify-between">
-              <CardTitle className="text-xs font-bold flex items-center space-x-2 text-zinc-800 dark:text-zinc-200">
-                <CheckCircle2 className="w-4 h-4 text-zinc-500" />
-                <span>Budget Allocations & Category Ceilings</span>
-              </CardTitle>
-              <span className="text-xs text-zinc-500">
-                {allocations.length} {allocations.length === 1 ? 'Category' : 'Categories'} Selected
-              </span>
-            </CardHeader>
-            <CardContent className="p-0">
-              {allocations.length === 0 ? (
-                <div className="py-12 text-center text-zinc-400 dark:text-zinc-600 text-xs">
-                  {t('noAllocations')}
+          {/* Budget Allocation Table — Scrollable with Zebra Striping */}
+          <div className="flex-1 min-h-0 border border-zinc-200 dark:border-zinc-700 rounded-lg overflow-hidden flex flex-col bg-white dark:bg-zinc-900">
+            {allocations.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center text-zinc-400 dark:text-zinc-600 text-xs">
+                <div className="text-center">
+                  <Layers className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                  <p>{t('noAllocations')}</p>
                 </div>
-              ) : (
-                <div className="overflow-x-auto">
+              </div>
+            ) : (
+              <>
+                <div className="flex-1 overflow-y-auto">
                   <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 text-zinc-500 dark:text-zinc-400">
-                        <th className="py-3 px-4 font-semibold w-12 text-center">#</th>
-                        <th className="py-3 px-4 font-semibold">{t('categoryName')}</th>
-                        <th className="py-3 px-4 font-semibold w-56">{t('allocatedAmount')}</th>
-                        <th className="py-3 px-4 font-semibold">{t('notes')}</th>
-                        {!isApproved && <th className="py-3 px-4 font-semibold w-16 text-center"></th>}
+                    <thead className="sticky top-0 z-10">
+                      <tr className="border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 text-zinc-500 dark:text-zinc-400 text-xs uppercase tracking-wider font-semibold">
+                        <th className="py-2.5 px-3 w-12 text-center">#</th>
+                        <th className="py-2.5 px-4">{t('categoryName')}</th>
+                        <th className="py-2.5 px-4 w-52 text-right">{t('allocatedAmount')}</th>
+                        {!isApproved && <th className="py-2.5 px-3 w-20 text-center"></th>}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                    <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
                       {groupedAllocations.map((group) => {
                         const groupTotalFormatted = (group.totalCents / 100).toLocaleString('en-US', {
                           minimumFractionDigits: 2,
@@ -1683,76 +1580,76 @@ export const FinancialYearView: React.FC = () => {
                         return (
                           <React.Fragment key={group.key}>
                             {/* Main Category Header Row */}
-                            <tr className="bg-zinc-100/90 dark:bg-zinc-800/80 font-semibold border-t-2 border-zinc-200 dark:border-zinc-700">
-                              <td className="py-2.5 px-4 text-center">
-                                <Layers className="w-4 h-4 text-zinc-600 dark:text-zinc-300 inline" />
+                            <tr className="bg-zinc-100/90 dark:bg-zinc-800/80 border-t-2 border-zinc-200 dark:border-zinc-700 font-semibold">
+                              <td className="py-2.5 px-3 text-center">
+                                <Layers className="w-4 h-4 text-zinc-500 dark:text-zinc-400 inline" />
                               </td>
                               <td className="py-2.5 px-4">
-                                <div className="flex items-center space-x-2">
-                                  {group.parentCode && (
-                                    <span className="font-mono px-2 py-0.5 rounded bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-bold">
-                                      {group.parentCode}
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    {group.parentCode && (
+                                      <span className="font-mono text-xs font-bold text-zinc-700 dark:text-zinc-200 bg-zinc-200/80 dark:bg-zinc-700/80 px-2 py-0.5 rounded">
+                                        {group.parentCode}
+                                      </span>
+                                    )}
+                                    <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                                      {group.parentName}
                                     </span>
-                                  )}
-                                  <span className="text-zinc-900 dark:text-zinc-100 font-bold text-xs">
-                                    {group.parentName}
-                                  </span>
-                                  {group.parentNameSi && group.parentNameSi !== group.parentName && (
-                                    <span className="text-[11px] text-zinc-500 font-sinhala font-normal">
-                                      ({group.parentNameSi})
+                                    {group.parentNameSi && group.parentNameSi !== group.parentName && (
+                                      <span className="text-xs text-zinc-400 font-sinhala">
+                                        ({group.parentNameSi})
+                                      </span>
+                                    )}
+                                    {!isReadOnly && group.mainCategoryId && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          openEditCategoryModal({
+                                            id: group.mainCategoryId!,
+                                            category_code: group.parentCode || '',
+                                            name: group.parentName || '',
+                                            name_si: group.parentNameSi || '',
+                                            is_parent: true,
+                                          })
+                                        }
+                                        className="p-1 rounded text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-700/60 transition-colors"
+                                        title="Edit Main Category"
+                                      >
+                                        <Edit3 className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                    <span className="text-[11px] text-zinc-400 font-normal">
+                                      • {group.subcategories.length} {group.subcategories.length === 1 ? 'subcategory' : 'subcategories'}
                                     </span>
-                                  )}
+                                  </div>
                                   {!isReadOnly && group.mainCategoryId && (
                                     <button
                                       type="button"
-                                      onClick={() =>
-                                        openEditCategoryModal({
-                                          id: group.mainCategoryId!,
-                                          category_code: group.parentCode || '',
-                                          name: group.parentName || '',
-                                          name_si: group.parentNameSi || '',
-                                          is_parent: true,
-                                        })
-                                      }
-                                      className="p-1 rounded text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-200/50 dark:hover:bg-zinc-700/50 transition-colors ml-1"
-                                      title="Edit Main Category Code & Name"
+                                      onClick={() => openCreateCategoryModal('', group.mainCategoryId)}
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 border border-blue-200/60 dark:border-blue-800/60 transition-colors mr-2"
                                     >
-                                      <Edit3 className="w-3.5 h-3.5" />
+                                      <Plus className="w-3 h-3" />
+                                      <span>Add Subcategory</span>
                                     </button>
                                   )}
-                                  <span className="text-[10px] text-zinc-500 font-normal ml-2">
-                                    • {group.subcategories.length} {group.subcategories.length === 1 ? 'subcategory' : 'subcategories'}
-                                  </span>
                                 </div>
                               </td>
                               <td className="py-2.5 px-4 text-right">
-                                <div className="font-mono font-bold text-zinc-900 dark:text-zinc-100 text-xs">
+                                <span className="font-mono font-bold text-zinc-900 dark:text-zinc-100 text-xs tabular-nums">
                                   Rs. {groupTotalFormatted}
-                                </div>
-                                <span className="text-[10px] text-zinc-400 font-normal">
-                                  {group.subcategories.length > 0 ? 'Subtotal' : 'Budget'}
+                                </span>
+                                <span className="block text-[9px] uppercase tracking-wider text-zinc-400 font-normal">
+                                  Subtotal
                                 </span>
                               </td>
-                              <td className="py-2.5 px-4 text-zinc-400 text-[11px]">
-                                {!isReadOnly && group.mainCategoryId && (
-                                  <button
-                                    type="button"
-                                    onClick={() => openCreateCategoryModal('', group.mainCategoryId)}
-                                    className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800 transition-colors"
-                                  >
-                                    <Plus className="w-3 h-3 mr-0.5" />
-                                    <span>Add Subcategory</span>
-                                  </button>
-                                )}
-                              </td>
                               {!isReadOnly && (
-                                <td className="py-2.5 px-4 text-center">
+                                <td className="py-2.5 px-3 text-center">
                                   {group.mainCategoryId && (
                                     <button
                                       type="button"
                                       onClick={() => handleRemoveMainCategory(group.mainCategoryId!)}
-                                      className="p-1 rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
-                                      title="Remove Main Category and subcategories"
+                                      className="p-1 rounded text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                                      title="Remove Main Category"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
                                     </button>
@@ -1764,8 +1661,8 @@ export const FinancialYearView: React.FC = () => {
                             {/* If no subcategories yet under this main category */}
                             {group.subcategories.length === 0 && (
                               <tr className="bg-zinc-50/40 dark:bg-zinc-900/20 italic">
-                                <td className="py-2 px-4 text-center text-zinc-400 font-mono">—</td>
-                                <td className="py-2 px-4 pl-8 text-zinc-500 text-xs" colSpan={!isReadOnly ? 3 : 4}>
+                                <td className="py-2 px-3 text-center text-zinc-300 font-mono text-xs">—</td>
+                                <td className="py-2 px-4 pl-8 text-zinc-400 text-xs" colSpan={!isReadOnly ? 3 : 2}>
                                   <div className="flex items-center justify-between">
                                     <span>No subcategories created yet under {group.parentName}.</span>
                                     {!isReadOnly && group.mainCategoryId && (
@@ -1774,24 +1671,23 @@ export const FinancialYearView: React.FC = () => {
                                         onClick={() => openCreateCategoryModal('', group.mainCategoryId)}
                                         className="text-xs text-blue-600 hover:underline font-medium not-italic"
                                       >
-                                        + Add Subcategory under {group.parentName}
+                                        + Add Subcategory
                                       </button>
                                     )}
                                   </div>
                                 </td>
-                                {!isReadOnly && <td className="py-2 px-4"></td>}
                               </tr>
                             )}
 
-                            {/* Child Subcategory Rows */}
-                            {group.subcategories.map(({ alloc, originalIndex }) => (
+                            {/* Child Subcategory Rows with Zebra Striping */}
+                            {group.subcategories.map(({ alloc, originalIndex }, subIdx) => (
                               <SubcategoryRow
                                 key={alloc.category_id}
                                 alloc={alloc}
                                 originalIndex={originalIndex}
+                                subIndex={subIdx}
                                 isReadOnly={isReadOnly}
                                 onAmountChange={handleAmountChange}
-                                onNotesChange={handleNotesChange}
                                 onRemoveCategory={handleRemoveCategory}
                                 onEditCategory={openEditCategoryModal}
                                 t={t}
@@ -1803,54 +1699,17 @@ export const FinancialYearView: React.FC = () => {
                     </tbody>
                   </table>
                 </div>
-              )}
 
-              {/* Table Summary & Total Display */}
-              <div className="p-4 bg-zinc-50 dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-                <div className="text-xs text-zinc-500">
-                  <span>{t('totalBudget')}:</span>
+                {/* Table Footer — Total */}
+                <div className="flex items-center justify-between px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800/50 border-t border-zinc-200 dark:border-zinc-700 flex-shrink-0">
+                  <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
+                    {t('totalBudget')}
+                  </span>
+                  <span className="text-sm font-bold font-mono text-zinc-900 dark:text-zinc-100 tabular-nums">
+                    Rs. {totalBudgetFormatted}
+                  </span>
                 </div>
-                <div className="text-xl font-bold font-mono text-zinc-900 dark:text-zinc-100">
-                  Rs. {totalBudgetFormatted}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Action Controls */}
-          <div className="flex items-center justify-between pt-2">
-            <Button
-              variant="outline"
-              size="md"
-              onClick={handleBackToList}
-            >
-              <ArrowLeft className="w-4 h-4 mr-1.5" />
-              <span>Back to Years List</span>
-            </Button>
-
-            {!isReadOnly && (
-              <div className="flex items-center space-x-3">
-                <Button
-                  variant="outline"
-                  size="md"
-                  onClick={handleSaveDraft}
-                  isLoading={saving}
-                  disabled={approving}
-                >
-                  <Edit3 className="w-4 h-4 mr-1.5" />
-                  <span>{saving ? t('saving') : t('saveDraft')}</span>
-                </Button>
-
-                <Button
-                  variant="primary"
-                  size="md"
-                  onClick={handleOpenApprovalModal}
-                  disabled={saving || allocations.length === 0}
-                >
-                  <CheckCircle2 className="w-4 h-4 mr-1.5" />
-                  <span>{t('approveBudget')}</span>
-                </Button>
-              </div>
+              </>
             )}
           </div>
         </div>
@@ -2143,19 +2002,6 @@ export const FinancialYearView: React.FC = () => {
                   />
                 </div>
               </div>
-
-              <div className="space-y-1">
-                <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                  {t('notesLabel')}
-                </label>
-                <input
-                  type="text"
-                  value={newCatNotes}
-                  onChange={(e) => setNewCatNotes(e.target.value)}
-                  placeholder={t('optionalNotes')}
-                  className="flex h-9 w-full rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-xs text-zinc-900 transition-colors placeholder:text-zinc-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-900 focus-visible:border-zinc-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder:text-zinc-500 dark:focus-visible:ring-zinc-300 dark:focus-visible:border-zinc-300"
-                />
-              </div>
             </>
           )}
 
@@ -2232,19 +2078,6 @@ export const FinancialYearView: React.FC = () => {
                 className="flex h-9 w-full pl-9 pr-3 py-1.5 text-xs font-mono rounded-md border border-zinc-200 bg-white text-zinc-900 transition-colors placeholder:text-zinc-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-900 focus-visible:border-zinc-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder:text-zinc-500 dark:focus-visible:ring-zinc-300 dark:focus-visible:border-zinc-300"
               />
             </div>
-          </div>
-
-          <div className="space-y-1">
-            <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300">
-              {t('notesLabel')}
-            </label>
-            <input
-              type="text"
-              value={existingCatNotes}
-              onChange={(e) => setExistingCatNotes(e.target.value)}
-              placeholder={t('optionalNotes')}
-              className="flex h-9 w-full rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-xs text-zinc-900 transition-colors placeholder:text-zinc-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-900 focus-visible:border-zinc-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder:text-zinc-500 dark:focus-visible:ring-zinc-300 dark:focus-visible:border-zinc-300"
-            />
           </div>
 
           <div className="flex justify-end space-x-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
